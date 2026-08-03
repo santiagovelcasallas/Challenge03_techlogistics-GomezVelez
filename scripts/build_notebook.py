@@ -139,23 +139,27 @@ Buscamos *clustering espacial*: zonas donde la biomasa/NDVI es consistentemente 
 candidatas a intervención. Usamos el estilo `open-street-map` (no requiere token Mapbox).
 """)
     code(r"""
+# Figura interactiva Plotly (mapa real OpenStreetMap) para exploración en el notebook
 fig_geo = viz_utils.geo_sensor_map(
     agro_noise, color="Agro_5", size="Agro_1",
     color_label="NDVI (Agro_5)", size_label="Humedad (Agro_1)",
     title="T1 · Sensores agro — NDVI (color) y Humedad (tamaño)",
 )
-try:
-    viz_utils.save_plotly(fig_geo, FIGS / "t1_geo_ndvi.png")
-    print("Figura exportada: figures/t1_geo_ndvi.png")
-except Exception as e:
-    print("No se pudo exportar PNG con kaleido, se guarda fallback matplotlib:", e)
-    plt.figure(figsize=(8, 6))
-    sc = plt.scatter(agro_noise["Longitude"], agro_noise["Latitude"],
-                     c=agro_noise["Agro_5"], s=20, cmap="RdYlGn")
-    plt.colorbar(sc, label="NDVI"); plt.xlabel("Longitud"); plt.ylabel("Latitud")
-    plt.title("T1 · Sensores agro (fallback)"); viz_utils.savefig(FIGS / "t1_geo_ndvi.png")
-    plt.close()
-fig_geo.show()
+
+# PNG de evidencia con matplotlib (export estático fiable, sin dependencia de kaleido,
+# que en Windows puede bloquear el kernel). Tamaño del marcador = Humedad normalizada.
+_sz = 12 + 60 * (agro_noise["Agro_1"] - agro_noise["Agro_1"].min()) / \
+      (agro_noise["Agro_1"].max() - agro_noise["Agro_1"].min())
+fig, ax = plt.subplots(figsize=(8, 6.5))
+sc = ax.scatter(agro_noise["Longitude"], agro_noise["Latitude"],
+                c=agro_noise["Agro_5"], s=_sz, cmap="RdYlGn",
+                alpha=0.8, edgecolor="k", linewidth=0.2)
+ax.set_xlabel("Longitud"); ax.set_ylabel("Latitud")
+ax.set_title("T1 · Sensores agro — Oriente Antioqueño (color=NDVI, tamaño=Humedad)")
+plt.colorbar(sc, label="NDVI (Agro_5)")
+fig.tight_layout(); viz_utils.savefig(FIGS / "t1_geo_ndvi.png"); plt.show()
+
+fig_geo.show()  # versión interactiva (Plotly scatter_mapbox)
 """)
 
     md(r"""
@@ -253,8 +257,13 @@ f_psd_c, psd_c = signal_utils.power_spectral_density(ener_clean["Ener_4"])
 f_psd_n, psd_n = signal_utils.power_spectral_density(ener_noise["Ener_4"])
 
 snr = signal_utils.snr_db(ener_clean["Ener_4"], ener_noise["Ener_4"])
-print(f"SNR real de Ener_4 (clean vs noise) = {snr:.2f} dB "
-      f"(rango objetivo del reto: 5–12 dB)")
+# SNR de todas las series de energía, para contextualizar
+snr_all = {c: round(signal_utils.snr_db(ener_clean[c], ener_noise[c]), 1) for c in ENER_COLS}
+print(f"SNR real de Ener_4 (clean vs noise) = {snr:.2f} dB")
+print(f"SNR por serie de energía (dB): {snr_all}")
+print("Nota: el objetivo nominal del reto era 5–12 dB. El SNR realizado en Ener_4 es mayor "
+      "porque su componente cíclico tiene gran amplitud; aun así Ener_4 es la serie-señal "
+      "de MENOR SNR (la más ruidosa del grupo principal), coherente con enfocar el filtrado ahí.")
 """)
 
     code(r"""
@@ -340,8 +349,8 @@ if MAX_PHASE >= 3:
 
 Construimos un **grafo dirigido** por dataset a partir de `Source_Node → Target_Node`
 (agro = topología *mesh*; energía = *despacho*). Calculamos **Centralidad de Grado** y
-**Betweenness Centrality**. El nodo con mayor *betweenness* es el **cuello de botella**:
-por él pasan más caminos mínimos, así que su fallo desconecta la red de forma desproporcionada.
+**Betweenness Centrality**. En principio el nodo de mayor *betweenness* sería el cuello de
+botella (por él pasan más caminos mínimos).
 """)
     code(r"""
 G_agro = graph_utils.build_directed_graph(agro_noise)
@@ -352,31 +361,51 @@ print(f"Grafo ENER: {G_ener.number_of_nodes()} nodos, {G_ener.number_of_edges()}
 
 cent_agro = graph_utils.centrality_table(G_agro)
 cent_ener = graph_utils.centrality_table(G_ener)
-print("\\nTop-5 betweenness — AGRO:"); display(cent_agro.head(5))
-print("Top-5 betweenness — ENER:"); display(cent_ener.head(5))
+print("\\nTop-5 por throughput — AGRO:"); display(cent_agro.head(5))
+print("Top-5 por throughput — ENER:"); display(cent_ener.head(5))
 """)
 
+    md(r"""
+### Hallazgo topológico clave: la red es **bipartita** (single-hop)
+
+Al inspeccionar los IDs, los `Source_Node` y `Target_Node` forman **conjuntos disjuntos**
+(agro: 1–14 → 15–29; energía: 100–119 → 200–249). Es decir, **ningún nodo actúa como
+intermediario**: todos los caminos tienen longitud 1 (origen→destino). En consecuencia la
+**betweenness es idénticamente 0 para todos los nodos** — no es un error, es una propiedad
+estructural. Por eso definimos el cuello de botella con un criterio robusto y con sentido
+operativo: el **throughput** (grado ponderado = número de registros que pasan por el nodo).
+`bottleneck_node()` detecta la degeneración y hace este *fallback* automáticamente.
+""")
     code(r"""
-bn_agro, bv_agro = graph_utils.bottleneck_node(G_agro)
-bn_ener, bv_ener = graph_utils.bottleneck_node(G_ener)
-print(f"Nodo cuello de botella AGRO: {bn_agro} (betweenness={bv_agro:.4f})")
-print(f"Nodo cuello de botella ENER: {bn_ener} (betweenness={bv_ener:.4f})")
+print("Origen y destino disjuntos (overlap):")
+for name, df in [("AGRO", agro_noise), ("ENER", ener_noise)]:
+    s = set(df["Source_Node"].astype(int)); t = set(df["Target_Node"].astype(int))
+    print(f"  {name}: |S|={len(s)} |T|={len(t)} overlap={len(s & t)} "
+          f"-> betweenness degenerada = {graph_utils.is_betweenness_degenerate(G_ener if name=='ENER' else G_agro)}")
+
+bn_agro, bv_agro, method_agro = graph_utils.bottleneck_node(G_agro)
+bn_ener, bv_ener, method_ener = graph_utils.bottleneck_node(G_ener)
+print(f"\\nNodo cuello de botella AGRO: {bn_agro}  ({method_agro} = {bv_agro:.0f} registros)")
+print(f"Nodo cuello de botella ENER: {bn_ener}  ({method_ener} = {bv_ener:.0f} registros)")
 """)
 
     code(r"""
 fig, ax = plt.subplots(1, 2, figsize=(16, 7))
 viz_utils.draw_directed_graph(G_agro, bottleneck=bn_agro,
-    title=f"T5 · Red AGRO (mesh) — cuello de botella: nodo {bn_agro}", ax=ax[0])
+    title=f"T5 · Red AGRO (bipartita) — cuello de botella (throughput): nodo {bn_agro}", ax=ax[0])
 viz_utils.draw_directed_graph(G_ener, bottleneck=bn_ener,
-    title=f"T5 · Red ENER (despacho) — cuello de botella: nodo {bn_ener}", ax=ax[1])
+    title=f"T5 · Red ENER (despacho) — cuello de botella (throughput): nodo {bn_ener}", ax=ax[1])
 fig.tight_layout(); viz_utils.savefig(FIGS / "t5_grafos_betweenness.png"); plt.show()
 """)
 
     md(r"""
-> **Lectura T5.** El nodo resaltado en rojo (mayor tamaño = mayor *betweenness*) concentra
-> el flujo. En la red de **despacho** eléctrico esto es crítico: un fallo ahí fragmenta el
-> despacho y propaga inestabilidad (ver P1). En la **mesh** agro la redundancia mitiga el
-> impacto, pero el nodo puente sigue siendo prioritario para mantenimiento.
+> **Lectura T5.** El nodo resaltado en rojo (mayor tamaño = mayor *throughput*) concentra el
+> flujo de registros. Como la topología es **bipartita** (single-hop), la *betweenness* no
+> discrimina; el criterio operativo correcto es el **grado ponderado**. En la red de
+> **despacho** eléctrico ese nodo de máximo throughput es crítico: canaliza la mayor parte
+> del despacho, y su fallo elimina esa capacidad de forma desproporcionada (ver P1). En la
+> **mesh** agro la redundancia mitiga el impacto, pero el nodo de mayor carga sigue siendo
+> prioritario para mantenimiento.
 """)
 
 # ============================================================= FASE 4
@@ -415,11 +444,13 @@ print("Conclusión:",
     md(r"""
 > **Interpretación P1.** Si `Ener_10` (Factor de Potencia) causa-Granger a `Ener_9`
 > (Voltaje), entonces variaciones en el factor de potencia **anticipan** cambios de voltaje.
-> Combinado con T5: un fallo en el **nodo de mayor betweenness** (cuello de botella del
-> despacho) que degrade el factor de potencia se propagaría —vía esta relación causal— como
-> inestabilidad de **voltaje** aguas abajo. Como por ese nodo pasan más caminos mínimos, la
-> perturbación alcanza a más subredes antes de poder aislarse → riesgo sistémico. Mitigación:
-> compensación reactiva (bancos de capacitores) y redundancia en el nodo puente.
+> Combinado con T5: un fallo en el **nodo de mayor throughput** (cuello de botella del
+> despacho, dado que la betweenness es degenerada por la topología bipartita) que degrade el
+> factor de potencia se propagaría —vía esta relación causal— como inestabilidad de
+> **voltaje** en todos los destinos que ese nodo alimenta. Como canaliza la mayor fracción de
+> registros de despacho, la perturbación afecta a más carga antes de poder aislarse → riesgo
+> sistémico. Mitigación: compensación reactiva (bancos de capacitores) y redundancia en el
+> nodo de mayor carga.
 """)
 
     # ---- P2 ----
@@ -560,7 +591,10 @@ Por eso el filtrado (T4) es un paso previo que **mejora la identificación** del
 Un nodo *bridge* (alta betweenness) es un punto de articulación: su caída no degrada una
 medición local, **parte la red en componentes** y corta la observabilidad/despacho entre
 subredes. El fallo pasa de "dato faltante" a "**pérdida de conectividad sistémica**"; la
-prioridad de mantenimiento y la redundancia deben ser máximas (ver T5 y P1).
+prioridad de mantenimiento y la redundancia deben ser máximas. *Matiz para este dataset:* la
+red es **bipartita** (single-hop), así que no existen nodos-puente en el sentido de
+betweenness; el rol crítico lo asume el **nodo de mayor throughput**, cuyo fallo elimina el
+despacho hacia todos sus destinos (ver T5 y P1).
 
 **4. ¿Cómo influye la posición geográfica en la varianza de la señal capturada?**
 La geografía modula la varianza: en **ladera/alta pendiente** (proxy `Agro_10`) hay mayor
@@ -576,7 +610,8 @@ print("="*60)
 print(f"T2  · Ener_5 (Costo Gas): {stationarity.classify_drift_vs_randomwalk(ener_noise['Ener_5'])['verdict']}")
 print(f"T3  · SNR real Ener_4: {signal_utils.snr_db(ener_clean['Ener_4'], ener_noise['Ener_4']):.2f} dB")
 print(f"T4  · Butterworth reduce el RMSE de Agro_3 (ver figura t4)")
-print(f"T5  · Cuello de botella ENER: nodo {bn_ener} | AGRO: nodo {bn_agro}")
+print(f"T5  · Cuello de botella (throughput) ENER: nodo {bn_ener} | AGRO: nodo {bn_agro} "
+      f"(betweenness degenerada por topología bipartita)")
 print("P1  · Granger Ener_10->Ener_9 evaluado (ver arriba)")
 print("P2  · Relación bajo-NDVI / alta-pendiente vía Spearman")
 print("P3  · ARIMAX con centralidad comparado por AIC")
