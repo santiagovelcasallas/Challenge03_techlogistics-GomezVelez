@@ -83,6 +83,7 @@ FIGS.mkdir(exist_ok=True)
 print("Project root:", ROOT)
 """)
 
+md("Importamos el stack científico y los módulos reutilizables de `src/`, y fijamos la semilla.")
 code(r"""
 import numpy as np
 import pandas as pd
@@ -266,6 +267,7 @@ print("Nota: el objetivo nominal del reto era 5–12 dB. El SNR realizado en Ene
       "de MENOR SNR (la más ruidosa del grupo principal), coherente con enfocar el filtrado ahí.")
 """)
 
+    md("Graficamos el espectro FFT y la PSD (Welch) de la versión *clean* vs *noise*.")
     code(r"""
 fig, ax = plt.subplots(1, 2, figsize=(13, 4.5))
 ax[0].plot(freqs_c, mag_c, label="clean", lw=0.9)
@@ -317,6 +319,7 @@ print(f"RMSE filtrada vs clean = {rmse_filt:.4f}")
 print(f"Reducción de error por el filtrado = {improve:.1f}%")
 """)
 
+    md("Comparamos visualmente las tres señales (noise, clean de referencia y filtrada) en una ventana.")
     code(r"""
 w = slice(0, 300)  # ventana para visualizar el detalle
 fig, ax = plt.subplots(figsize=(12, 4.5))
@@ -389,6 +392,8 @@ print(f"\\nNodo cuello de botella AGRO: {bn_agro}  ({method_agro} = {bv_agro:.0f
 print(f"Nodo cuello de botella ENER: {bn_ener}  ({method_ener} = {bv_ener:.0f} registros)")
 """)
 
+    md("Visualizamos ambas redes; el nodo cuello de botella (mayor throughput) se resalta en rojo "
+       "y el tamaño de cada nodo escala con su throughput.")
     code(r"""
 fig, ax = plt.subplots(1, 2, figsize=(16, 7))
 viz_utils.draw_directed_graph(G_agro, bottleneck=bn_agro,
@@ -480,6 +485,7 @@ print(f"Celdas GPS agregadas: {len(grid)}")
 print(f"Spearman(NDVI, pendiente_proxy) = {rho:.3f} (p={pval:.4g})")
 print("Signo negativo ⇒ a menor NDVI, mayor pendiente (relación esperada).")
 """)
+    md("Graficamos NDVI vs pendiente-proxy por celda GPS para visualizar la relación.")
     code(r"""
 fig, ax = plt.subplots(figsize=(7, 5.5))
 sc = ax.scatter(grid["slope_proxy"], grid["ndvi"], c=grid["ndvi"],
@@ -532,6 +538,8 @@ def fit_order():
 order = fit_order()
 print("Orden ARIMA seleccionado:", order)
 """)
+    md("Ajustamos dos ARIMAX con el mismo orden: uno solo con Temperatura y otro añadiendo la "
+       "centralidad del nodo de origen. Comparamos el AIC.")
     code(r"""
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import warnings; warnings.filterwarnings("ignore")
@@ -551,6 +559,7 @@ print(f"ΔAIC = {delta:.2f}  ->",
       "incluir la centralidad MEJORA el modelo." if delta > 2
       else "la centralidad NO mejora significativamente el modelo (ΔAIC<=2).")
 """)
+    md("Revisamos la significancia estadística del coeficiente de centralidad en el modelo completo.")
     code(r"""
 # Significancia del coeficiente de centralidad en el modelo completo
 coef = m_full.params.get("src_centrality", np.nan)
