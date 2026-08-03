@@ -1,5 +1,7 @@
 # TechLogistics S.A. — Challenge 03: Analítica Multidimensional
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/santiagovelcasallas/Challenge03_techlogistics-GomezVelez/blob/main/notebooks/challenge03_analitica_multidimensional.ipynb)
+
 Análisis multicapa (CRISP-DM) sobre dos redes de sensores de **TechLogistics S.A.**:
 **Agroindustria/Clima** (`agro_*`) y **Energía/Economía** (`ener_*`). El proyecto combina
 **geo-visualización**, **procesamiento de señales** (FFT, filtrado Butterworth),
@@ -45,7 +47,14 @@ es el entorno virtual (`venv/`), cachés y checkpoints.
 
 ---
 
-## 🔧 Reproducción
+## ▶️ Ejecutar en Google Colab (sin instalar nada)
+
+Haz clic en el botón **Open in Colab** de arriba y luego *Entorno de ejecución → Ejecutar
+todo*. La **primera celda (Bootstrap)** detecta que está en Colab, **clona este repositorio**
+(trayendo `src/` y `data/`) e instala `pmdarima`, de modo que `from src import ...` y la carga
+de los CSV funcionan sin pasos manuales. La misma celda no hace nada cuando se ejecuta en local.
+
+## 🔧 Reproducción local
 
 Requiere **Python 3.11** (probado en 3.11.4). Las dependencias están **pinneadas a
 versiones exactas** en `requirements.txt`; el pipeline completo se ejecuta de cero sin
