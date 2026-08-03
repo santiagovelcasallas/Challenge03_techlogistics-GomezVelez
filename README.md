@@ -47,7 +47,10 @@ es el entorno virtual (`venv/`), cachés y checkpoints.
 
 ## 🔧 Reproducción
 
-Requiere **Python 3.11**.
+Requiere **Python 3.11** (probado en 3.11.4). Las dependencias están **pinneadas a
+versiones exactas** en `requirements.txt`; el pipeline completo se ejecuta de cero sin
+errores con ese conjunto. Para una réplica byte-a-byte de todo el árbol, usar
+`requirements-lock.txt`.
 
 ```bash
 # 1) Crear y activar el entorno virtual
@@ -55,8 +58,9 @@ py -m venv venv
 venv\Scripts\activate            # Windows PowerShell/CMD
 # source venv/bin/activate       # Linux/macOS
 
-# 2) Instalar dependencias
+# 2) Instalar dependencias (versiones exactas probadas)
 pip install -r requirements.txt
+#   alternativa exacta de todo el árbol:  pip install -r requirements-lock.txt
 
 # 3) (Opcional) Regenerar el notebook desde el generador
 py scripts/build_notebook.py
@@ -68,6 +72,10 @@ jupyter nbconvert --to notebook --execute --inplace ^
 # 5) Generar el informe PDF
 py scripts/build_report.py
 ```
+
+> ✅ **Verificado**: se recreó el entorno desde cero (`venv` limpio → `requirements.txt`) y
+> se reejecutó todo el pipeline (58 celdas, **0 errores**) + generación del PDF. El `venv/`
+> NO se versiona (está en `.gitignore`); cada quien lo reconstruye con los comandos de arriba.
 
 ---
 
