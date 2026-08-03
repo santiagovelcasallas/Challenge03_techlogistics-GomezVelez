@@ -44,20 +44,24 @@ def draw_directed_graph(G: nx.DiGraph, bottleneck: int | None = None,
                         max_labels: int = 25):
     """Draw a directed graph, highlighting the bottleneck node in red.
 
-    Node size scales with betweenness centrality.
+    Node size scales with **throughput** (weighted degree). Betweenness is not used
+    for sizing because this topology is bipartite (all betweenness values are 0).
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(11, 8))
-    btw = nx.betweenness_centrality(G, normalized=True)
+    wdeg = {n: sum(d.get("weight", 1) for _, _, d in G.in_edges(n, data=True))
+               + sum(d.get("weight", 1) for _, _, d in G.out_edges(n, data=True))
+            for n in G.nodes()}
+    wmax = max(wdeg.values()) or 1
     pos = nx.spring_layout(G, seed=42, k=0.6)
-    sizes = [300 + 6000 * btw.get(n, 0) for n in G.nodes()]
+    sizes = [200 + 2500 * wdeg[n] / wmax for n in G.nodes()]
     colors = ["#d62728" if n == bottleneck else "#1f77b4" for n in G.nodes()]
-    nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.25, arrows=True,
-                           arrowsize=8, edge_color="gray")
+    nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.20, arrows=True,
+                           arrowsize=7, edge_color="gray")
     nx.draw_networkx_nodes(G, pos, ax=ax, node_size=sizes, node_color=colors,
                            alpha=0.85, linewidths=0.5, edgecolors="white")
-    # only label the most central nodes to avoid clutter
-    top = sorted(btw, key=btw.get, reverse=True)[:max_labels]
+    # label the highest-throughput nodes to avoid clutter
+    top = sorted(wdeg, key=wdeg.get, reverse=True)[:max_labels]
     nx.draw_networkx_labels(G, pos, ax=ax,
                             labels={n: str(n) for n in top}, font_size=7)
     ax.set_title(title)
