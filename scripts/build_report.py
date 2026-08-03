@@ -76,13 +76,32 @@ grid = (agro.groupby(["lat_grid", "lon_grid"])
              .agg(ndvi=("Agro_5", "mean"), slope=("Agro_10", "mean")).reset_index())
 rho, rho_p = spearmanr(grid["ndvi"], grid["slope"])
 
-# P3 ARIMAX AIC (fixed order for speed/reproducibility of the report)
+# P3 ARIMAX AIC. El orden se elige con el mismo auto_arima que el notebook para que
+# los AIC del informe coincidan con los del notebook (fallback a (2,0,2) si falla).
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 deg_cent = graph_utils.node_centrality_map(G_ener, kind="degree")
 ener = ener_noise.copy()
 ener["src_centrality"] = ener["Source_Node"].astype(int).map(deg_cent).fillna(0.0)
 y = ener["Ener_1"].astype(float)
-order = (2, 0, 2)
+
+
+def _select_order():
+    try:
+        import pmdarima as pm
+        X0 = ener[["Ener_3"]]
+        try:
+            return pm.auto_arima(y, X=X0, seasonal=False, max_p=3, max_q=3, d=None,
+                                 stepwise=True, suppress_warnings=True,
+                                 error_action="ignore").order
+        except TypeError:
+            return pm.auto_arima(y, exogenous=X0, seasonal=False, max_p=3, max_q=3,
+                                 d=None, stepwise=True, suppress_warnings=True,
+                                 error_action="ignore").order
+    except Exception:
+        return (2, 0, 2)
+
+
+order = _select_order()
 aic_base = SARIMAX(y, exog=ener[["Ener_3"]], order=order,
                    enforce_stationarity=False, enforce_invertibility=False).fit(disp=False).aic
 m_full = SARIMAX(y, exog=ener[["Ener_3", "src_centrality"]], order=order,

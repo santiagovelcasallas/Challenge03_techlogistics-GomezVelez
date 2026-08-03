@@ -529,14 +529,22 @@ X_full = ener[["Ener_3", "src_centrality"]].astype(float)
 
 # orden ARIMA: intentamos pmdarima.auto_arima; si no está, usamos SARIMAX fijo
 def fit_order():
+    # pmdarima >=2 usa X=; versiones antiguas usan exogenous=. Probamos ambos y,
+    # si pmdarima no está disponible, caemos a un orden fijo razonable.
     try:
         import pmdarima as pm
-        m = pm.auto_arima(y, exogenous=X_base, seasonal=False,
-                          max_p=3, max_q=3, d=None, stepwise=True,
-                          suppress_warnings=True, error_action="ignore")
+        try:
+            m = pm.auto_arima(y, X=X_base, seasonal=False, max_p=3, max_q=3,
+                              d=None, stepwise=True, suppress_warnings=True,
+                              error_action="ignore")
+        except TypeError:
+            m = pm.auto_arima(y, exogenous=X_base, seasonal=False, max_p=3,
+                              max_q=3, d=None, stepwise=True,
+                              suppress_warnings=True, error_action="ignore")
+        print("auto_arima (pmdarima) seleccionó el orden:", m.order)
         return m.order
     except Exception as e:
-        print("pmdarima no disponible/uso fallback SARIMAX (2,0,2):", e)
+        print("pmdarima no disponible; uso fallback SARIMAX (2,0,2):", e)
         return (2, 0, 2)
 
 order = fit_order()
