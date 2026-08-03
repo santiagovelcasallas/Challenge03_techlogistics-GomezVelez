@@ -123,8 +123,10 @@ def add_figure(name: str, caption: str, width=15.5):
 
 # --------------------------------------------------------------- cover
 P("Informe Técnico Ejecutivo", "Title")
-P("Challenge 02 — Analítica Multidimensional", "H2c")
+P("Challenge 03 — Analítica Multidimensional", "H2c")
 P("TechLogistics S.A. · Metodología CRISP-DM · EAFIT — Maestría en Ciencia de los Datos", "Small")
+P("Nota: el PDF fuente se titula 'Challenge 02' por un error de numeración del docente; "
+  "corresponde al workshop de la Lecture 03, por lo que se unifica como Challenge 03.", "Small")
 SP(0.3)
 P("Este informe sintetiza los hallazgos del análisis multicapa sobre las redes de "
   "sensores de <b>Agroindustria/Clima</b> y <b>Energía/Economía</b>. Combina procesamiento "
@@ -276,6 +278,6 @@ OUT.parent.mkdir(parents=True, exist_ok=True)
 doc = SimpleDocTemplate(str(OUT), pagesize=A4,
                         topMargin=1.6 * cm, bottomMargin=1.6 * cm,
                         leftMargin=2 * cm, rightMargin=2 * cm,
-                        title="Informe Técnico — Challenge 02 TechLogistics")
+                        title="Informe Técnico — Challenge 03 TechLogistics")
 doc.build(story)
 print(f"PDF generado: {OUT}")

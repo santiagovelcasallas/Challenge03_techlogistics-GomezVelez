@@ -1,4 +1,4 @@
-# TechLogistics S.A. — Challenge 02: Analítica Multidimensional
+# TechLogistics S.A. — Challenge 03: Analítica Multidimensional
 
 Análisis multicapa (CRISP-DM) sobre dos redes de sensores de **TechLogistics S.A.**:
 **Agroindustria/Clima** (`agro_*`) y **Energía/Economía** (`ener_*`). El proyecto combina
@@ -7,16 +7,20 @@ Análisis multicapa (CRISP-DM) sobre dos redes de sensores de **TechLogistics S.
 **modelado** (Granger, ARIMAX) para responder tres preguntas de negocio y cuatro de validación.
 
 > Proyecto académico — EAFIT, Maestría en Ciencia de los Datos.
+>
+> **Nota sobre la numeración:** el PDF del docente se titula *"Challenge 02"*, pero corresponde
+> al **workshop de la Lecture 03**. Se unifica la etiqueta a **Challenge 03** (el "02" fue un
+> error de numeración en el documento fuente).
 
 ---
 
 ## 📁 Estructura del repositorio
 
 ```
-techlogistics-challenge02/
+Challenge03_techlogistics-GomezVelez/
 ├── data/                 # CSV (clean + noise) — versionados (pequeños, reproducibilidad)
 ├── notebooks/
-│   └── challenge02_analitica_multidimensional.ipynb   # análisis completo (ejecutado)
+│   └── challenge03_analitica_multidimensional.ipynb   # análisis completo (ejecutado)
 ├── src/                  # funciones reutilizables
 │   ├── io_utils.py       # carga + DatetimeIndex sintético + diccionario de variables
 │   ├── stationarity.py   # ADF, rolling stats, drift vs random walk
@@ -59,7 +63,7 @@ py scripts/build_notebook.py
 
 # 4) Ejecutar el notebook de principio a fin
 jupyter nbconvert --to notebook --execute --inplace ^
-  notebooks/challenge02_analitica_multidimensional.ipynb
+  notebooks/challenge03_analitica_multidimensional.ipynb
 
 # 5) Generar el informe PDF
 py scripts/build_report.py

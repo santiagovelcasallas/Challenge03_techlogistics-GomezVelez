@@ -1,4 +1,4 @@
-"""Reusable analysis utilities for the TechLogistics Challenge 02 project.
+"""Reusable analysis utilities for the TechLogistics Challenge 03 project.
 
 Modules
 -------

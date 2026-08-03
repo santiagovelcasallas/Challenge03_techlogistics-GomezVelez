@@ -15,7 +15,7 @@ import nbformat as nbf
 
 MAX_PHASE = int(os.environ.get("MAX_PHASE", "4"))
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "notebooks" / "challenge02_analitica_multidimensional.ipynb"
+OUT = ROOT / "notebooks" / "challenge03_analitica_multidimensional.ipynb"
 
 cells: list = []
 
@@ -30,8 +30,12 @@ def code(text: str) -> None:
 
 # ===================================================================== INTRO
 md(r"""
-# Challenge 02 — Analítica Multidimensional
+# Challenge 03 — Analítica Multidimensional
 ### TechLogistics S.A. · Metodología CRISP-DM · EAFIT — Maestría en Ciencia de los Datos
+
+> **Nota sobre la numeración.** El PDF entregado por el docente se titula "Challenge 02",
+> pero corresponde al **workshop de la Lecture 03**; unificamos la etiqueta a **Challenge 03**
+> (el "02" fue un error de numeración en el documento fuente).
 
 Este notebook resuelve, de principio a fin, el reto de **analítica multidimensional**
 sobre dos dominios operativos de TechLogistics:
