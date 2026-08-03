@@ -1,0 +1,29 @@
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.ipynb_checkpoints/
+
+# Jupyter
+*.ipynb_checkpoints
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs / temp
+*.log
+pip_install.log
+scripts/_build_tmp/
+
+# NOTE: /data IS versioned on purpose (small CSVs, needed for reproducibility).
+# NOTE: /figures and /reports ARE versioned (they are graded deliverables).
