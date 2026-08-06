@@ -21,6 +21,7 @@ networkx==3.6.1
 plotly==6.9.0
 matplotlib==3.11.1
 seaborn==0.13.2
+contextily==1.7.1        # basemap real (teselas OSM) bajo el scatter estático de T1
 kaleido==0.2.1          # incluido por requerimiento del reto (export estático de Plotly).
                         # NOTA: en Windows su primer write_image puede bloquear el kernel,
                         # por eso las figuras PNG se exportan con matplotlib (equivalente).

@@ -37,7 +37,7 @@ if not _found:
     os.chdir(REPO_DIR)
     # Dependencias que Colab no incluye por defecto (best-effort: el modelo P3
     # tiene fallback si pmdarima no queda disponible).
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pmdarima"], check=False)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pmdarima", "contextily"], check=False)
     print("Repositorio listo. Directorio de trabajo:", Path.cwd())
 else:
     print("Proyecto encontrado localmente. Directorio de trabajo:", Path.cwd())'''

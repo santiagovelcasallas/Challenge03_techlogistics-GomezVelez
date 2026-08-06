@@ -95,7 +95,8 @@ if not _found:
     os.chdir(REPO_DIR)
     # Dependencias que Colab no incluye por defecto (best-effort: el modelo P3
     # tiene fallback si pmdarima no queda disponible).
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pmdarima"], check=False)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q",
+                    "pmdarima", "contextily"], check=False)
     print("Repositorio listo. Directorio de trabajo:", Path.cwd())
 else:
     print("Proyecto encontrado localmente. Directorio de trabajo:", Path.cwd())
@@ -190,14 +191,20 @@ fig_geo = viz_utils.geo_sensor_map(
 
 # PNG de evidencia con matplotlib (export estático fiable, sin dependencia de kaleido,
 # que en Windows puede bloquear el kernel). Tamaño del marcador = Humedad normalizada.
+import contextily as cx
 _sz = 12 + 60 * (agro_noise["Agro_1"] - agro_noise["Agro_1"].min()) / \
       (agro_noise["Agro_1"].max() - agro_noise["Agro_1"].min())
 fig, ax = plt.subplots(figsize=(8, 6.5))
 sc = ax.scatter(agro_noise["Longitude"], agro_noise["Latitude"],
                 c=agro_noise["Agro_5"], s=_sz, cmap="RdYlGn",
-                alpha=0.8, edgecolor="k", linewidth=0.2)
+                alpha=0.85, edgecolor="k", linewidth=0.2, zorder=3)
+# Capa de fondo: mapa real del Oriente Antioqueño (teselas OpenStreetMap, sin token),
+# reproyectadas para alinearse a los ejes en coordenadas lat/lon (EPSG:4326).
+cx.add_basemap(ax, crs="EPSG:4326", source=cx.providers.OpenStreetMap.Mapnik,
+               attribution_size=5)
 ax.set_xlabel("Longitud"); ax.set_ylabel("Latitud")
 ax.set_title("T1 · Sensores agro — Oriente Antioqueño (color=NDVI, tamaño=Humedad)")
+ax.grid(True, color="white", alpha=0.5, linewidth=0.6, zorder=2)  # grid lat/lon visible
 plt.colorbar(sc, label="NDVI (Agro_5)")
 fig.tight_layout(); viz_utils.savefig(FIGS / "t1_geo_ndvi.png"); plt.show()
 
