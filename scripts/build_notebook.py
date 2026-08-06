@@ -184,7 +184,7 @@ candidatas a intervención. Usamos el estilo `open-street-map` (no requiere toke
     code(r"""
 # Figura interactiva Plotly (mapa real OpenStreetMap) para exploración en el notebook
 fig_geo = viz_utils.geo_sensor_map(
-    agro_noise, color="Agro_5", size="Agro_1",
+    agro_clean, color="Agro_5", size="Agro_1",
     color_label="NDVI (Agro_5)", size_label="Humedad (Agro_1)",
     title="T1 · Sensores agro — NDVI (color) y Humedad (tamaño)",
 )
@@ -192,11 +192,11 @@ fig_geo = viz_utils.geo_sensor_map(
 # PNG de evidencia con matplotlib (export estático fiable, sin dependencia de kaleido,
 # que en Windows puede bloquear el kernel). Tamaño del marcador = Humedad normalizada.
 import contextily as cx
-_sz = 12 + 60 * (agro_noise["Agro_1"] - agro_noise["Agro_1"].min()) / \
-      (agro_noise["Agro_1"].max() - agro_noise["Agro_1"].min())
+_sz = 12 + 60 * (agro_clean["Agro_1"] - agro_clean["Agro_1"].min()) / \
+      (agro_clean["Agro_1"].max() - agro_clean["Agro_1"].min())
 fig, ax = plt.subplots(figsize=(8, 6.5))
-sc = ax.scatter(agro_noise["Longitude"], agro_noise["Latitude"],
-                c=agro_noise["Agro_5"], s=_sz, cmap="RdYlGn",
+sc = ax.scatter(agro_clean["Longitude"], agro_clean["Latitude"],
+                c=agro_clean["Agro_5"], s=_sz, cmap="RdYlGn",
                 alpha=0.85, edgecolor="k", linewidth=0.2, zorder=3)
 # Capa de fondo: mapa real del Oriente Antioqueño (teselas OpenStreetMap, sin token),
 # reproyectadas para alinearse a los ejes en coordenadas lat/lon (EPSG:4326).
@@ -217,16 +217,16 @@ y verificamos si esos sensores se concentran geográficamente (usamos la mediana
 lat/lon como partición simple y reportamos la fracción de sensores de bajo NDVI por zona).
 """)
     code(r"""
-q1_ndvi = agro_noise["Agro_5"].quantile(0.25)
-low = agro_noise[agro_noise["Agro_5"] <= q1_ndvi]
-lat_med, lon_med = agro_noise["Latitude"].median(), agro_noise["Longitude"].median()
+q1_ndvi = agro_clean["Agro_5"].quantile(0.25)
+low = agro_clean[agro_clean["Agro_5"] <= q1_ndvi]
+lat_med, lon_med = agro_clean["Latitude"].median(), agro_clean["Longitude"].median()
 
 def zone(row):
     ns = "N" if row["Latitude"] >= lat_med else "S"
     ew = "E" if row["Longitude"] >= lon_med else "O"
     return ns + ew
 
-agro_noise["_zona"] = agro_noise.apply(zone, axis=1)
+agro_clean["_zona"] = agro_clean.apply(zone, axis=1)
 low = low.assign(_zona=low.apply(zone, axis=1))
 share = (low["_zona"].value_counts(normalize=True) * 100).round(1)
 print(f"Umbral NDVI (Q1) = {q1_ndvi:.3f}. Distribución de sensores de BAJO NDVI por zona (%):")
@@ -245,7 +245,7 @@ Esperamos, según el diccionario: `Ener_1-3` correlacionadas, `Ener_5-7` **no**
 estacionarias (macro), `Ener_8-10` estacionarias (calidad de potencia).
 """)
     code(r"""
-adf_ener = stationarity.adf_table(ener_noise, ENER_COLS, io_utils.ENER_NAMES)
+adf_ener = stationarity.adf_table(ener_clean, ENER_COLS, io_utils.ENER_NAMES)
 display(adf_ener)
 """)
 
@@ -258,7 +258,7 @@ sistemática (tendencia direccional); un **Random Walk puro** vaga sin direcció
 (media de las primeras diferencias ≈ 0 frente a su dispersión).
 """)
     code(r"""
-serie = ener_noise["Ener_5"]
+serie = ener_clean["Ener_5"]
 roll = stationarity.rolling_stats(serie, window=50)
 diag = stationarity.classify_drift_vs_randomwalk(serie, window=50)
 
