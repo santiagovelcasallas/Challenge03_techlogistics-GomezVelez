@@ -388,22 +388,15 @@ fig.tight_layout(); viz_utils.savefig(FIGS / "t4_agro3_butterworth.png"); plt.sh
 > la banda de la señal fisiológica de RH y por debajo de la banda de ruido detectada en T3.
 """)
 
-# ============================================================= FASE 3
-if MAX_PHASE >= 3:
-    md(r"""
----
-# FASE 3 — Grafos y Topología de Red
-""")
+# =====================================================================
+# FASE 3 — Grafos y Topología de Red: Análisis para la Junta Directiva
+# =====================================================================
 
-    md(r"""
-## T5 · Grafo dirigido, centralidades y **Nodo Cuello de Botella**
+import matplotlib.pyplot as plt
+import networkx as nx
+from src import graph_utils, viz_utils
 
-Construimos un **grafo dirigido** por dataset a partir de `Source_Node → Target_Node`
-(agro = topología *mesh*; energía = *despacho*). Calculamos **Centralidad de Grado** y
-**Betweenness Centrality**. En principio el nodo de mayor *betweenness* sería el cuello de
-botella (por él pasan más caminos mínimos).
-""")
-    code(r"""
+# --- 1. Construcción del Grafo Dirigido y Tablas de Centralidad ---
 G_agro = graph_utils.build_directed_graph(agro_noise)
 G_ener = graph_utils.build_directed_graph(ener_noise)
 
@@ -412,54 +405,64 @@ print(f"Grafo ENER: {G_ener.number_of_nodes()} nodos, {G_ener.number_of_edges()}
 
 cent_agro = graph_utils.centrality_table(G_agro)
 cent_ener = graph_utils.centrality_table(G_ener)
-print("\\nTop-5 por throughput — AGRO:"); display(cent_agro.head(5))
-print("Top-5 por throughput — ENER:"); display(cent_ener.head(5))
-""")
 
-    md(r"""
-### Hallazgo topológico clave: la red es **bipartita** (single-hop)
+print("\nTop-5 Nodos por Throughput (Tráfico) — Red AGRO:")
+display(cent_agro.head(5))
 
-Al inspeccionar los IDs, los `Source_Node` y `Target_Node` forman **conjuntos disjuntos**
-(agro: 1–14 → 15–29; energía: 100–119 → 200–249). Es decir, **ningún nodo actúa como
-intermediario**: todos los caminos tienen longitud 1 (origen→destino). En consecuencia la
-**betweenness es idénticamente 0 para todos los nodos** — no es un error, es una propiedad
-estructural. Por eso definimos el cuello de botella con un criterio robusto y con sentido
-operativo: el **throughput** (grado ponderado = número de registros que pasan por el nodo).
-`bottleneck_node()` detecta la degeneración y hace este *fallback* automáticamente.
-""")
-    code(r"""
-print("Origen y destino disjuntos (overlap):")
-for name, df in [("AGRO", agro_noise), ("ENER", ener_noise)]:
-    s = set(df["Source_Node"].astype(int)); t = set(df["Target_Node"].astype(int))
-    print(f"  {name}: |S|={len(s)} |T|={len(t)} overlap={len(s & t)} "
-          f"-> betweenness degenerada = {graph_utils.is_betweenness_degenerate(G_ener if name=='ENER' else G_agro)}")
+print("\nTop-5 Nodos por Throughput (Tráfico) — Red ENERGÍA:")
+display(cent_ener.head(5))
+
+
+# --- 2. Demostración Visual Bipartita (Storytelling para Junta Directiva) ---
+# Mostramos que los nodos Origen y Destino son conjuntos 100% disjuntos.
+# Al organizar la red en 2 columnas (Izquierda: Origen, Derecha: Destino),
+# la junta ve claramente que NO hay puentes o intermediarios (Betweenness = 0.0).
+
+fig, ax = plt.subplots(1, 2, figsize=(16, 7))
+
+viz_utils.draw_directed_graph(
+    G_agro, layout="bipartite",
+    title="Red AGRO: Estructura Bipartita (Sensores Izq -> Gateways Der)",
+    ax=ax[0]
+)
+
+viz_utils.draw_directed_graph(
+    G_ener, layout="bipartite",
+    title="Red ENER: Estructura Bipartita (Despacho Izq -> Carga Der)",
+    ax=ax[1]
+)
+
+fig.tight_layout()
+plt.show()
+
+
+# --- 3. Identificación del Nodo Cuello de Botella con Transparencia al 50% ---
+# Se resalta únicamente el nodo de mayor Throughput (Rojo, alpha=1.0), 
+# aplicando 50% de transparencia (alpha=0.50) a todos los demás nodos.
 
 bn_agro, bv_agro, method_agro = graph_utils.bottleneck_node(G_agro)
 bn_ener, bv_ener, method_ener = graph_utils.bottleneck_node(G_ener)
-print(f"\\nNodo cuello de botella AGRO: {bn_agro}  ({method_agro} = {bv_agro:.0f} registros)")
-print(f"Nodo cuello de botella ENER: {bn_ener}  ({method_ener} = {bv_ener:.0f} registros)")
-""")
 
-    md("Visualizamos ambas redes; el nodo cuello de botella (mayor throughput) se resalta en rojo "
-       "y el tamaño de cada nodo escala con su throughput.")
-    code(r"""
+print(f"Nodo Cuello de Botella AGRO: Nodo {bn_agro} ({method_agro} = {bv_agro:.0f} registros)")
+print(f"Nodo Cuello de Botella ENER: Nodo {bn_ener} ({method_ener} = {bv_ener:.0f} registros)")
+
 fig, ax = plt.subplots(1, 2, figsize=(16, 7))
-viz_utils.draw_directed_graph(G_agro, bottleneck=bn_agro,
-    title=f"T5 · Red AGRO (bipartita) — cuello de botella (throughput): nodo {bn_agro}", ax=ax[0])
-viz_utils.draw_directed_graph(G_ener, bottleneck=bn_ener,
-    title=f"T5 · Red ENER (despacho) — cuello de botella (throughput): nodo {bn_ener}", ax=ax[1])
-fig.tight_layout(); viz_utils.savefig(FIGS / "t5_grafos_betweenness.png"); plt.show()
-""")
 
-    md(r"""
-> **Lectura T5.** El nodo resaltado en rojo (mayor tamaño = mayor *throughput*) concentra el
-> flujo de registros. Como la topología es **bipartita** (single-hop), la *betweenness* no
-> discrimina; el criterio operativo correcto es el **grado ponderado**. En la red de
-> **despacho** eléctrico ese nodo de máximo throughput es crítico: canaliza la mayor parte
-> del despacho, y su fallo elimina esa capacidad de forma desproporcionada (ver P1). En la
-> **mesh** agro la redundancia mitiga el impacto, pero el nodo de mayor carga sigue siendo
-> prioritario para mantenimiento.
-""")
+viz_utils.draw_directed_graph(
+    G_agro, bottleneck=bn_agro,
+    title=f"Red AGRO — Cuello de Botella Resaltado: Nodo {bn_agro}",
+    ax=ax[0]
+)
+
+viz_utils.draw_directed_graph(
+    G_ener, bottleneck=bn_ener,
+    title=f"Red ENER — Cuello de Botella Resaltado: Nodo {bn_ener}",
+    ax=ax[1]
+)
+
+fig.tight_layout()
+viz_utils.savefig(FIGS / "t5_grafos_entrega_junta.png")
+plt.show()
 
 # ============================================================= FASE 4
 if MAX_PHASE >= 4:
