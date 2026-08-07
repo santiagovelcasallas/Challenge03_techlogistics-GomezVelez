@@ -6,31 +6,31 @@
 #   py -m venv venv && venv\Scripts\activate && pip install -r requirements.txt
 
 # Core data stack
-numpy==2.4.6
-pandas==3.0.5
-scipy==1.17.1
+numpy
+pandas
+scipy
 
 # Time series / econometrics
 statsmodels==0.14.6
 pmdarima==2.1.1
 
 # Graphs / networks
-networkx==3.6.1
+networkx
 
 # Visualization
-plotly==6.9.0
-matplotlib==3.11.1
-seaborn==0.13.2
+plotly>=6.9.0
+matplotlib>=3.11.1
+seaborn
 contextily       # basemap real (teselas OSM) bajo el scatter estático de T1
-kaleido==0.2.1          # incluido por requerimiento del reto (export estático de Plotly).
+kaleido          # incluido por requerimiento del reto (export estático de Plotly).
                         # NOTA: en Windows su primer write_image puede bloquear el kernel,
                         # por eso las figuras PNG se exportan con matplotlib (equivalente).
 
 # Machine learning utils
-scikit-learn==1.9.0
+scikit-learn>=1.9.0
 
 # Notebook / reporting
-nbformat==5.10.4
-nbconvert==7.17.1
-jupyter==1.1.1
-reportlab==5.0.0        # generación programática del PDF
+nbformat
+nbconvert
+jupyter
+reportlab>=5.0.0        # generación programática del PDF
