@@ -216,8 +216,9 @@ P("<b>Nota topológica.</b> La red es <b>bipartita</b> (Source y Target son conj
   "(ningún nodo es intermediario). El cuello de botella se define entonces por "
   "<b>throughput</b> (grado ponderado = registros que pasan por el nodo), criterio con "
   "sentido operativo directo.", "Small")
-add_figure("t5_grafos_betweenness.png",
-           "Figura P1/T5. Redes dirigidas bipartitas; en rojo el nodo cuello de botella (mayor throughput).")
+add_figure("t5_grafos_entrega_junta.png",
+           "Figura P1/T5. Redes dirigidas bipartitas; en rojo (opaco, borde negro) el nodo cuello "
+           "de botella por throughput, resto al 50% de transparencia.")
 
 # --------------------------------------------------------------- P2
 P("P2 · Bajo NDVI, pendiente y recomendación de inversión hídrica", "H2c")
