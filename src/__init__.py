@@ -6,7 +6,9 @@ io_utils      : data loading and synthetic time index construction.
 stationarity  : ADF tests and rolling (moving-window) statistics.
 signal_utils  : FFT / power spectral density, Butterworth filtering, SNR, RMSE.
 graph_utils   : directed-graph construction and centrality metrics.
+spatial       : spatial autocorrelation (Moran's I with permutation test).
 viz_utils     : geo-visualization and general plotting helpers.
 """
 
-__all__ = ["io_utils", "stationarity", "signal_utils", "graph_utils", "viz_utils"]
+__all__ = ["io_utils", "stationarity", "signal_utils", "graph_utils",
+           "spatial", "viz_utils"]
