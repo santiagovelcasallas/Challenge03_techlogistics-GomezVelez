@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# ruff: noqa
+from __future__ import annotations
+
 """Programmatically build the analysis notebook with nbformat.
 
 Every code cell is preceded by a Markdown cell explaining the technical logic
@@ -7,14 +11,17 @@ notebook incrementally for atomic per-phase commits; default builds all phases.
 Usage:
     py scripts/build_notebook.py
 """
-from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 import nbformat as nbf
 
-MAX_PHASE = int(os.environ.get("MAX_PHASE", "4"))
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+MAX_PHASE = int(os.environ.get("MAX_PHASE", "4"))
 OUT = ROOT / "notebooks" / "challenge03_analitica_multidimensional.ipynb"
 
 cells: list = []
@@ -30,8 +37,8 @@ def code(text: str) -> None:
 
 # ===================================================================== INTRO
 md(r"""
-# Challenge 03 — Analítica Multidimensional
-### TechLogistics S.A. · Metodología CRISP-DM · EAFIT — Maestría en Ciencia de los Datos
+# Challenge 03 - Analítica Multidimensional
+### TechLogistics S.A. . Metodología CRISP-DM . EAFIT - Maestría en Ciencia de los Datos
 
 > **Nota sobre la numeración.** El PDF entregado por el docente se titula "Challenge 02",
 > pero corresponde al **workshop de la Lecture 03**; unificamos la etiqueta a **Challenge 03**
@@ -40,8 +47,8 @@ md(r"""
 Este notebook resuelve, de principio a fin, el reto de **analítica multidimensional**
 sobre dos dominios operativos de TechLogistics:
 
-- **Agroindustria / Clima** (`agro_*`) — red de sensores tipo *mesh* en el Oriente Antioqueño.
-- **Energía / Economía** (`ener_*`) — red de *despacho* eléctrico.
+- **Agroindustria / Clima** (`agro_*`) - red de sensores tipo *mesh* en el Oriente Antioqueño.
+- **Energía / Economía** (`ener_*`) - red de *despacho* eléctrico.
 
 Se cubren cuatro fases CRISP-DM: (1) *Data Understanding* + geo-visualización,
 (2) procesamiento de señales y filtrado, (3) grafos y topología de red, y
@@ -85,7 +92,7 @@ def _project_here(p) -> bool:
     p = Path(p)
     return (p / "src").is_dir() and (p / "data").is_dir()
 
-# ¿El proyecto ya está disponible (ejecución local dentro del repo)?
+# El proyecto ya está disponible (ejecución local dentro del repo)?
 _found = any(_project_here(p) for p in [Path.cwd(), *Path.cwd().parents])
 
 if not _found:
@@ -145,7 +152,7 @@ md(r"""
 
 Cargamos los cuatro archivos y adjuntamos el índice horario sintético. Recordar que
 `clean` es la **referencia real** y `noise` es la señal observada con ruido inyectado
-(SNR objetivo del reto en el rango 5–12 dB).
+(SNR objetivo del reto en el rango 5-12 dB).
 """)
 code(r"""
 agro_clean, agro_noise = io_utils.load_pair(DATA, "agro")
@@ -169,12 +176,12 @@ display(ener_noise[ENER_COLS].describe().T[["mean", "std", "min", "max"]])
 if MAX_PHASE >= 1:
     md(r"""
 ---
-# FASE 1 — Data Understanding y Geo-Visualización
+# FASE 1 - Data Understanding y Geo-Visualización
 """)
 
     # ---- T1 ----
     md(r"""
-## T1 · Geo-visualización de sensores (Plotly `scatter_mapbox`)
+## T1 . Geo-visualización de sensores (Plotly `scatter_mapbox`)
 
 Ubicamos los sensores agro en el mapa del Oriente Antioqueño. **Color = NDVI (`Agro_5`)**
 (verde = vegetación sana, rojo = baja) y **tamaño = Humedad del suelo (`Agro_1`)**.
@@ -186,7 +193,7 @@ candidatas a intervención. Usamos el estilo `open-street-map` (no requiere toke
 fig_geo = viz_utils.geo_sensor_map(
     agro_clean, color="Agro_5", size="Agro_1",
     color_label="NDVI (Agro_5)", size_label="Humedad (Agro_1)",
-    title="T1 · Sensores agro — NDVI (color) y Humedad (tamaño)",
+    title="T1 . Sensores agro - NDVI (color) y Humedad (tamaño)",
 )
 
 # PNG de evidencia con matplotlib (export estático fiable, sin dependencia de kaleido,
@@ -203,7 +210,7 @@ sc = ax.scatter(agro_clean["Longitude"], agro_clean["Latitude"],
 cx.add_basemap(ax, crs="EPSG:4326", source=cx.providers.OpenStreetMap.Mapnik,
                attribution_size=5)
 ax.set_xlabel("Longitud"); ax.set_ylabel("Latitud")
-ax.set_title("T1 · Sensores agro — Oriente Antioqueño (color=NDVI, tamaño=Humedad)")
+ax.set_title("T1 . Sensores agro - Oriente Antioqueño (color=NDVI, tamaño=Humedad)")
 ax.grid(True, color="white", alpha=0.5, linewidth=0.6, zorder=2)  # grid lat/lon visible
 plt.colorbar(sc, label="NDVI (Agro_5)")
 fig.tight_layout(); viz_utils.savefig(FIGS / "t1_geo_ndvi.png"); plt.show()
@@ -237,10 +244,10 @@ print("\\nInterpretación: una zona que concentra desproporcionadamente el bajo 
 
     # ---- T2 ----
     md(r"""
-## T2 · Estacionariedad de las series de energía (ADF) + estadísticos móviles
+## T2 . Estacionariedad de las series de energía (ADF) + estadísticos móviles
 
 Aplicamos el test **Augmented Dickey-Fuller** a las 10 series de energía. H0: existe raíz
-unitaria (serie **no** estacionaria). Si `p < 0.05` rechazamos H0 → estacionaria.
+unitaria (serie **no** estacionaria). Si `p < 0.05` rechazamos H0 -> estacionaria.
 Esperamos, según el diccionario: `Ener_1-3` correlacionadas, `Ener_5-7` **no**
 estacionarias (macro), `Ener_8-10` estacionarias (calidad de potencia).
 """)
@@ -250,12 +257,12 @@ display(adf_ener)
 """)
 
     md(r"""
-### ¿`Ener_5` (Costo del Gas) es *Drift* o *Random Walk*?
+### `Ener_5` (Costo del Gas) es *Drift* o *Random Walk*?
 
 Para una serie **no estacionaria** aplicamos ventana móvil de **50 registros** y graficamos
 media y varianza móviles. Un **Random Walk con Drift** exhibe una media móvil con pendiente
 sistemática (tendencia direccional); un **Random Walk puro** vaga sin dirección
-(media de las primeras diferencias ≈ 0 frente a su dispersión).
+(media de las primeras diferencias ~= 0 frente a su dispersión).
 """)
     code(r"""
 serie = ener_clean["Ener_5"]
@@ -264,7 +271,7 @@ diag = stationarity.classify_drift_vs_randomwalk(serie, window=50)
 
 fig, ax = plt.subplots(3, 1, figsize=(11, 9), sharex=True)
 ax[0].plot(serie.index, serie.values, lw=0.7); ax[0].set_ylabel("Ener_5")
-ax[0].set_title("T2 · Costo del Gas (Ener_5) — serie observada")
+ax[0].set_title("T2 . Costo del Gas (Ener_5) - serie observada")
 ax[1].plot(roll.index, roll["rolling_mean"], color="darkorange")
 ax[1].set_ylabel("Media móvil (50)")
 ax[2].plot(roll.index, roll["rolling_var"], color="seagreen")
@@ -287,12 +294,12 @@ for k, v in diag.items():
 if MAX_PHASE >= 2:
     md(r"""
 ---
-# FASE 2 — Procesamiento de Señales y Filtrado
+# FASE 2 - Procesamiento de Señales y Filtrado
 """)
 
     # ---- T3 ----
     md(r"""
-## T3 · Análisis espectral de `Ener_4` (Generación Eólica) con FFT
+## T3 . Análisis espectral de `Ener_4` (Generación Eólica) con FFT
 
 `Ener_4` es una señal **cíclica compleja**. Calculamos la **densidad espectral de potencia**
 vía FFT/Welch para la versión *clean* (referencia) y la *noise*. Comparamos los espectros
@@ -310,7 +317,7 @@ snr = signal_utils.snr_db(ener_clean["Ener_4"], ener_noise["Ener_4"])
 snr_all = {c: round(signal_utils.snr_db(ener_clean[c], ener_noise[c]), 1) for c in ENER_COLS}
 print(f"SNR real de Ener_4 (clean vs noise) = {snr:.2f} dB")
 print(f"SNR por serie de energía (dB): {snr_all}")
-print("Nota: el objetivo nominal del reto era 5–12 dB. El SNR realizado en Ener_4 es mayor "
+print("Nota: el objetivo nominal del reto era 5-12 dB. El SNR realizado en Ener_4 es mayor "
       "porque su componente cíclico tiene gran amplitud; aun así Ener_4 es la serie-señal "
       "de MENOR SNR (la más ruidosa del grupo principal), coherente con enfocar el filtrado ahí.")
 """)
@@ -320,18 +327,18 @@ print("Nota: el objetivo nominal del reto era 5–12 dB. El SNR realizado en Ene
 fig, ax = plt.subplots(1, 2, figsize=(13, 4.5))
 ax[0].plot(freqs_c, mag_c, label="clean", lw=0.9)
 ax[0].plot(freqs_n, mag_n, label="noise", lw=0.7, alpha=0.7)
-ax[0].set_title("T3 · Espectro FFT — Ener_4")
+ax[0].set_title("T3 . Espectro FFT - Ener_4")
 ax[0].set_xlabel("Frecuencia (ciclos/hora)"); ax[0].set_ylabel("Magnitud"); ax[0].legend()
 
 ax[1].semilogy(f_psd_c, psd_c, label="clean")
 ax[1].semilogy(f_psd_n, psd_n, label="noise", alpha=0.7)
-ax[1].set_title("T3 · PSD (Welch) — Ener_4")
+ax[1].set_title("T3 . PSD (Welch) - Ener_4")
 ax[1].set_xlabel("Frecuencia (ciclos/hora)"); ax[1].set_ylabel("PSD (log)"); ax[1].legend()
 fig.tight_layout(); viz_utils.savefig(FIGS / "t3_ener4_spectrum.png"); plt.show()
 """)
 
     md(r"""
-**¿Dónde está el ruido?** El ruido de banda ancha eleva la PSD de la señal *noise* por
+**Dónde está el ruido?** El ruido de banda ancha eleva la PSD de la señal *noise* por
 encima de la *clean* de forma sostenida en las **altas frecuencias** (donde la señal
 cíclica original casi no tiene energía). Cuantificamos la banda dominante del residuo.
 """)
@@ -348,7 +355,7 @@ print("El ruido inyectado es de tipo banda-ancha/alta-frecuencia, separable por 
 
     # ---- T4 ----
     md(r"""
-## T4 · Filtro Butterworth pasa-bajo sobre `Agro_3` (RH) + RMSE
+## T4 . Filtro Butterworth pasa-bajo sobre `Agro_3` (RH) + RMSE
 
 Diseñamos un **Butterworth pasa-bajo** (orden 4, `filtfilt` de fase cero) para limpiar
 `Agro_3` (Humedad Relativa, versión *noise*). Como referencia usamos la señal *clean* real.
@@ -356,7 +363,7 @@ Calculamos el **RMSE** de (a) noise vs clean y (b) filtrada vs clean para cuanti
 mejora, y discutimos el impacto en capacidad predictiva.
 """)
     code(r"""
-cutoff = 0.05  # ciclos/hora — deja pasar la dinámica lenta de RH, corta el ruido rápido
+cutoff = 0.05  # ciclos/hora - deja pasar la dinámica lenta de RH, corta el ruido rápido
 agro3_filt = signal_utils.butter_lowpass(agro_noise["Agro_3"], cutoff=cutoff, fs=1.0, order=4)
 
 rmse_noise = signal_utils.rmse(agro_noise["Agro_3"], agro_clean["Agro_3"])
@@ -374,7 +381,7 @@ fig, ax = plt.subplots(figsize=(12, 4.5))
 ax.plot(agro_noise["Agro_3"].values[w], color="lightgray", lw=0.8, label="noise")
 ax.plot(agro_clean["Agro_3"].values[w], color="black", lw=1.2, label="clean (ref)")
 ax.plot(agro3_filt[w], color="crimson", lw=1.2, label="Butterworth filtrada")
-ax.set_title("T4 · Agro_3 (RH): noise vs clean vs Butterworth (primeros 300 registros)")
+ax.set_title("T4 . Agro_3 (RH): noise vs clean vs Butterworth (primeros 300 registros)")
 ax.set_xlabel("registro"); ax.set_ylabel("RH"); ax.legend()
 fig.tight_layout(); viz_utils.savefig(FIGS / "t4_agro3_butterworth.png"); plt.show()
 """)
@@ -388,10 +395,24 @@ fig.tight_layout(); viz_utils.savefig(FIGS / "t4_agro3_butterworth.png"); plt.sh
 > la banda de la señal fisiológica de RH y por debajo de la banda de ruido detectada en T3.
 """)
 
-# =====================================================================
-# FASE 3 — Grafos y Topología de Red: Análisis para la Junta Directiva
-# =====================================================================
+# ============================================================= FASE 3
+if MAX_PHASE >= 3:
+    md(r"""
+---
+# FASE 3 - Grafos y Topología de Red: Análisis para la Junta Directiva
 
+## T5 - Análisis de Redes (Grafos Dirigidos), Centralidades y Cuello de Botella
+
+Construimos los grafos dirigidos ponderados para la red **AGRO** y la red **ENERGÍA** a partir
+de las columnas `Source_Node` y `Target_Node`. Calculamos las tablas de centralidades (degree,
+in-degree, out-degree, degree centrality, betweenness centrality y throughput/peso total)
+y mostramos que la betweenness centrality es **0.0 para todos los nodos** debido a la
+**topología bipartita** (los conjuntos de nodos de Origen y Destino son 100% disjuntos, por lo
+que no existen nodos intermedios que conecten otros pares). En consecuencia, identificamos el
+**nodo cuello de botella por Throughput (tráfico acumulado)** y generamos la visualización
+bipartita con el nodo crítico resaltado (los demás con 50% de transparencia).
+""")
+    code(r"""
 import matplotlib.pyplot as plt
 import networkx as nx
 from src import graph_utils, viz_utils
@@ -406,18 +427,20 @@ print(f"Grafo ENER: {G_ener.number_of_nodes()} nodos, {G_ener.number_of_edges()}
 cent_agro = graph_utils.centrality_table(G_agro)
 cent_ener = graph_utils.centrality_table(G_ener)
 
-print("\nTop-5 Nodos por Throughput (Tráfico) — Red AGRO:")
+print("\nTop-5 Nodos por Throughput (Tráfico) - Red AGRO:")
 display(cent_agro.head(5))
 
-print("\nTop-5 Nodos por Throughput (Tráfico) — Red ENERGÍA:")
+print("\nTop-5 Nodos por Throughput (Tráfico) - Red ENERGÍA:")
 display(cent_ener.head(5))
+""")
 
-
-# --- 2. Demostración Visual Bipartita (Storytelling para Junta Directiva) ---
-# Mostramos que los nodos Origen y Destino son conjuntos 100% disjuntos.
-# Al organizar la red en 2 columnas (Izquierda: Origen, Derecha: Destino),
-# la junta ve claramente que NO hay puentes o intermediarios (Betweenness = 0.0).
-
+    md(r"""
+### Demostración Visual Bipartita (Storytelling para Junta Directiva)
+Mostramos que los nodos Origen y Destino son conjuntos 100% disjuntos.
+Al organizar la red en 2 columnas (Izquierda: Origen, Derecha: Destino),
+la junta ve claramente que NO hay puentes o intermediarios (Betweenness = 0.0).
+""")
+    code(r"""
 fig, ax = plt.subplots(1, 2, figsize=(16, 7))
 
 viz_utils.draw_directed_graph(
@@ -434,12 +457,14 @@ viz_utils.draw_directed_graph(
 
 fig.tight_layout()
 plt.show()
+""")
 
-
-# --- 3. Identificación del Nodo Cuello de Botella con Transparencia al 50% ---
-# Se resalta únicamente el nodo de mayor Throughput (Rojo, alpha=1.0), 
-# aplicando 50% de transparencia (alpha=0.50) a todos los demás nodos.
-
+    md(r"""
+### Identificación del Nodo Cuello de Botella con Transparencia al 50%
+Se resalta únicamente el nodo de mayor Throughput (Rojo, alpha=1.0), 
+aplicando 50% de transparencia (alpha=0.50) a todos los demás nodos.
+""")
+    code(r"""
 bn_agro, bv_agro, method_agro = graph_utils.bottleneck_node(G_agro)
 bn_ener, bv_ener, method_ener = graph_utils.bottleneck_node(G_ener)
 
@@ -450,32 +475,129 @@ fig, ax = plt.subplots(1, 2, figsize=(16, 7))
 
 viz_utils.draw_directed_graph(
     G_agro, bottleneck=bn_agro,
-    title=f"Red AGRO — Cuello de Botella Resaltado: Nodo {bn_agro}",
+    title=f"Red AGRO - Cuello de Botella Resaltado: Nodo {bn_agro}",
     ax=ax[0]
 )
 
 viz_utils.draw_directed_graph(
     G_ener, bottleneck=bn_ener,
-    title=f"Red ENER — Cuello de Botella Resaltado: Nodo {bn_ener}",
+    title=f"Red ENER - Cuello de Botella Resaltado: Nodo {bn_ener}",
     ax=ax[1]
 )
 
 fig.tight_layout()
 viz_utils.savefig(FIGS / "t5_grafos_entrega_junta.png")
 plt.show()
+""")
+
+    md(r"""
+---
+## Fundamento Matemático: Centralidad de Nodo y Betweenness Centrality
+
+### 1. Degree Centrality (Centralidad de Grado)
+
+Para un nodo $v$ en un grafo dirigido $G = (V, E)$ con $n = |V|$ nodos:
+
+$$C_D^{in}(v) = \frac{k^{in}(v)}{n - 1}, \qquad C_D^{out}(v) = \frac{k^{out}(v)}{n - 1}$$
+
+donde $k^{in}(v)$ y $k^{out}(v)$ son los grados de entrada y salida respectivamente.
+El **Throughput** (tráfico ponderado) del nodo $v$ se define como:
+
+$$T(v) = \sum_{(u,v) \in E} w_{uv} + \sum_{(v,u) \in E} w_{vu}$$
+
+siendo $w_{ij}$ el peso (número de registros transmitidos) de la arista $(i,j)$.
+
+### 2. Betweenness Centrality (Centralidad de Intermediación)
+
+La betweenness centrality cuantifica cuántos caminos mínimos entre pares de nodos
+pasan por el nodo $v$:
+
+$$C_B(v) = \sum_{s \neq v \neq t \in V} \frac{\sigma_{st}(v)}{\sigma_{st}}$$
+
+donde $\sigma_{st}$ es el número total de caminos geodésicos (mínimos) entre $s$ y $t$,
+y $\sigma_{st}(v)$ es el número de esos caminos que pasan por $v$. Normalizada:
+
+$$C_B^{norm}(v) = \frac{C_B(v)}{(n-1)(n-2)}$$
+
+### 3. Por qué Betweenness = 0 en estas redes (topología bipartita)
+
+Ambas redes son **bipartitas**: el conjunto de nodos Origen (sensores / fuentes de
+despacho) y el conjunto Destino (gateways / cargas) son **100% disjuntos** y las
+aristas solo van de Origen a Destino. Por definición, no existe ningún nodo $v$
+que actúe como intermediario en un camino $s \to t$ donde $s$ y $t$ sean nodos
+distintos del opuesto conjunto. Matemáticamente:
+
+$$\forall v \in V: \sigma_{st}(v) = 0 \implies C_B(v) = 0$$
+
+En ausencia de puentes topológicos, el **Throughput** (peso acumulado de aristas
+incidentes) se convierte en la métrica de criticidad relevante.
+""")
+
+    md(r"""
+---
+## Interpretación Ingenieril: Cuello de Botella en Redes AGRO y ENER
+
+### Red AGRO — Monitoreo de Precisión en Cultivos de Exportación
+
+La red agroindustrial integra sensores mesh distribuidos geográficamente en el
+Oriente Antioqueño. Cada `Source_Node` corresponde a un **sensor de campo**
+y cada `Target_Node` a un **gateway concentrador** de datos. Las variables
+que circulan por la red son:
+
+| Variables | Tipo | Criticidad de transmisión |
+|-----------|------|---------------------------|
+| `Agro_1-3` Variables Hídricas (Humedad, Evapotransp., RH) | I(0), alta correlación | Alta: control de riego |
+| `Agro_4` Radiación PAR | Cíclica día/noche | Media: programación nocturna |
+| `Agro_5-7` NDVI, Biomasa (Índices Bióticos) | I(1), no estacionaria | Muy alta: alerta fitosanitaria |
+| `Agro_8-10` Suelo y Viento | Estacionarias, ruido blanco | Baja-media: estabilidad ambiental |
+
+**Nodo 10** es el cuello de botella de la red AGRO (mayor Throughput).
+En términos de operación agrícola esto significa que el **gateway Nodo 10**
+concentra la mayor fracción de mediciones críticas de humedad (Agro_1-3) e
+índices bióticos (Agro_5-7). Un fallo en este nodo dejaría sin telemetría
+en tiempo real a la mayor parte del cultivo, impidiendo la activación
+automática del riego de precisión y la detección temprana de estrés hídrico
+o plagas (caída de NDVI). **Acción recomendada**: gateway redundante o
+partición de la zona de cobertura del Nodo 10 entre dos gateways.
+
+### Red ENER — Despacho Eléctrico
+
+La red energética modela el flujo de despacho donde `Source_Node` es un
+**nodo generador/fuente** y `Target_Node` es un **nodo de carga/consumo**.
+Las variables relevantes son:
+
+| Variables | Tipo | Criticidad de despacho |
+|-----------|------|------------------------|
+| `Ener_1` Demanda eléctrica | Serie objetivo | Crítica: balance oferta/demanda |
+| `Ener_3` Temperatura ambiente | Exógena | Alta: modula la demanda |
+| `Ener_4` Generación Eólica | Cíclica, I(0) con ruido alto | Alta: intermitencia renovable |
+| `Ener_5` Costo del Gas | I(1), Random Walk con Drift | Alta: despacho económico |
+| `Ener_9` Voltaje | Estacionaria | Muy alta: calidad de potencia |
+| `Ener_10` Factor de Potencia | Estacionaria | Muy alta: eficiencia reactiva |
+
+**Nodo 119** es el cuello de botella de la red ENER (mayor Throughput).
+Este nodo fuente canaliza la mayor cantidad de registros de despacho hacia
+múltiples cargas simultáneamente. Dado que `Ener_10` (Factor de Potencia)
+**causa-Granger** a `Ener_9` (Voltaje), una degradación del factor de
+potencia en el Nodo 119 se propaga como inestabilidad de voltaje en todos
+sus nodos destino. Al ser el nodo de mayor throughput, la perturbación
+afecta a más carga antes de poder aislarse, generando **riesgo sistémico**.
+**Acción recomendada**: bancos de capacitores reactivos y redundancia
+topológica en el Nodo 119.
+""")
 
 # ============================================================= FASE 4
 if MAX_PHASE >= 4:
     md(r"""
 ---
-# FASE 4 — Modelado y Decisiones (CRISP-DM)
+# FASE 4 - Modelado y Decisiones (CRISP-DM)
 
-Respondemos las tres **preguntas de negocio** (P1–P3) con evidencia cuantitativa.
+Respondemos las tres **preguntas de negocio** (P1-P3) con evidencia cuantitativa.
 """)
 
     # ---- P1 ----
     md(r"""
-## P1 · Causalidad de Granger: Factor de Potencia (`Ener_10`) → Voltaje (`Ener_9`)
+## P1 . Causalidad de Granger: Factor de Potencia (`Ener_10`) -> Voltaje (`Ener_9`)
 
 El test de **Granger** evalúa si los valores pasados de `Ener_10` ayudan a predecir
 `Ener_9` más allá del propio pasado de `Ener_9`. Ambas son variables de **calidad de
@@ -485,7 +607,7 @@ H0: `Ener_10` **no** causa-Granger a `Ener_9`.
     code(r"""
 from statsmodels.tsa.stattools import grangercausalitytests
 
-# columnas en orden [Y, X]: ¿X (Ener_10) causa-Granger Y (Ener_9)?
+# columnas en orden [Y, X]: X (Ener_10) causa-Granger Y (Ener_9)?
 gc_data = ener_noise[["Ener_9", "Ener_10"]].dropna()
 maxlag = 5
 res = grangercausalitytests(gc_data, maxlag=maxlag, verbose=False)
@@ -502,20 +624,20 @@ print("Conclusión:",
 > (Voltaje), entonces variaciones en el factor de potencia **anticipan** cambios de voltaje.
 > Combinado con T5: un fallo en el **nodo de mayor throughput** (cuello de botella del
 > despacho, dado que la betweenness es degenerada por la topología bipartita) que degrade el
-> factor de potencia se propagaría —vía esta relación causal— como inestabilidad de
+> factor de potencia se propagaría -vía esta relación causal- como inestabilidad de
 > **voltaje** en todos los destinos que ese nodo alimenta. Como canaliza la mayor fracción de
-> registros de despacho, la perturbación afecta a más carga antes de poder aislarse → riesgo
+> registros de despacho, la perturbación afecta a más carga antes de poder aislarse -> riesgo
 > sistémico. Mitigación: compensación reactiva (bancos de capacitores) y redundancia en el
 > nodo de mayor carga.
 """)
 
     # ---- P2 ----
     md(r"""
-## P2 · GPS filtrado, bajo NDVI y zonas de alta pendiente (proxy: varianza del viento)
+## P2 . GPS filtrado, bajo NDVI y zonas de alta pendiente (proxy: varianza del viento)
 
 Filtramos el **ruido de coordenadas GPS** agregando por sensor (redondeo de lat/lon a una
 rejilla) para estabilizar la posición. Usamos la **varianza del viento (`Agro_10`)** como
-*proxy de pendiente* (terreno accidentado ⇒ mayor turbulencia/varianza). Evaluamos si los
+*proxy de pendiente* (terreno accidentado => mayor turbulencia/varianza). Evaluamos si los
 sensores de **menor NDVI** coinciden con **mayor pendiente** mediante correlación de
 **Spearman** (de rango, robusta a no linealidad y a tendencias).
 """)
@@ -523,7 +645,7 @@ sensores de **menor NDVI** coinciden con **mayor pendiente** mediante correlaci�
 from scipy.stats import spearmanr
 
 agro = agro_noise.copy()
-# --- filtrado de ruido GPS: rejilla ~0.01° (~1 km) y promedio de la señal por celda ---
+# --- filtrado de ruido GPS: rejilla ~0.01 deg (~1 km) y promedio de la señal por celda ---
 agro["lat_grid"] = agro["Latitude"].round(2)
 agro["lon_grid"] = agro["Longitude"].round(2)
 grid = (agro.groupby(["lat_grid", "lon_grid"])
@@ -534,7 +656,7 @@ grid = (agro.groupby(["lat_grid", "lon_grid"])
 rho, pval = spearmanr(grid["ndvi"], grid["slope_proxy"])
 print(f"Celdas GPS agregadas: {len(grid)}")
 print(f"Spearman(NDVI, pendiente_proxy) = {rho:.3f} (p={pval:.4g})")
-print("Signo negativo ⇒ a menor NDVI, mayor pendiente (relación esperada).")
+print("Signo negativo => a menor NDVI, mayor pendiente (relación esperada).")
 """)
     md("Graficamos NDVI vs pendiente-proxy por celda GPS para visualizar la relación.")
     code(r"""
@@ -543,7 +665,7 @@ sc = ax.scatter(grid["slope_proxy"], grid["ndvi"], c=grid["ndvi"],
                 cmap="RdYlGn", s=40, edgecolor="k", linewidth=0.3)
 ax.set_xlabel("Pendiente (proxy = varianza del viento Agro_10)")
 ax.set_ylabel("NDVI medio por celda GPS")
-ax.set_title("P2 · Bajo NDVI vs alta pendiente (celdas GPS filtradas)")
+ax.set_title("P2 . Bajo NDVI vs alta pendiente (celdas GPS filtradas)")
 plt.colorbar(sc, label="NDVI"); fig.tight_layout()
 viz_utils.savefig(FIGS / "p2_ndvi_vs_slope.png"); plt.show()
 """)
@@ -557,7 +679,7 @@ viz_utils.savefig(FIGS / "p2_ndvi_vs_slope.png"); plt.show()
 
     # ---- P3 ----
     md(r"""
-## P3 · ARIMAX para la Demanda (`Ener_1`) con exógenas Temperatura + Centralidad del nodo
+## P3 . ARIMAX para la Demanda (`Ener_1`) con exógenas Temperatura + Centralidad del nodo
 
 Ajustamos un **ARIMAX** para la Demanda con dos variables exógenas:
 `Ener_3` (Temperatura) y la **centralidad de grado del nodo de origen** de cada registro
@@ -640,7 +762,7 @@ print(m_full.summary().tables[1])
 ---
 ## Preguntas de Validación (respondidas en el notebook y ampliadas en el informe)
 
-**1. ¿Por qué NO es válido aplicar Pearson directo sobre una serie con tendencia
+**1. Por qué NO es válido aplicar Pearson directo sobre una serie con tendencia
 (NDVI / precio de exportación)?**
 Pearson supone observaciones i.i.d. y estacionariedad conjunta. Dos series con **tendencia**
 (I(1)) comparten un componente temporal común, produciendo **correlación espuria**: el
@@ -649,13 +771,13 @@ autocorrelación viola el supuesto de independencia e **infla** la significancia
 diferenciar (I(0)) o usar cointegración / correlación de rango.
 
 **2. Impacto del ruido de 5 dB en los coeficientes del modelo ARMA vs la versión clean.**
-A menor SNR (≈5 dB, mucho ruido), el ruido blanco **sesga los coeficientes AR hacia 0**
+A menor SNR (~=5 dB, mucho ruido), el ruido blanco **sesga los coeficientes AR hacia 0**
 (*attenuation bias*): la varianza extra en el regresor diluye la autocorrelación estimada,
 así que el modelo subestima la persistencia y sobreestima la varianza del término MA/error.
 La versión *clean* recupera coeficientes AR más grandes y estables (menor error estándar).
 Por eso el filtrado (T4) es un paso previo que **mejora la identificación** del ARMA.
 
-**3. ¿Cómo cambia la interpretación de un fallo si el sensor es un "Bridge" en el grafo?**
+**3. Cómo cambia la interpretación de un fallo si el sensor es un "Bridge" en el grafo?**
 Un nodo *bridge* (alta betweenness) es un punto de articulación: su caída no degrada una
 medición local, **parte la red en componentes** y corta la observabilidad/despacho entre
 subredes. El fallo pasa de "dato faltante" a "**pérdida de conectividad sistémica**"; la
@@ -664,25 +786,25 @@ red es **bipartita** (single-hop), así que no existen nodos-puente en el sentid
 betweenness; el rol crítico lo asume el **nodo de mayor throughput**, cuyo fallo elimina el
 despacho hacia todos sus destinos (ver T5 y P1).
 
-**4. ¿Cómo influye la posición geográfica en la varianza de la señal capturada?**
+**4. Cómo influye la posición geográfica en la varianza de la señal capturada?**
 La geografía modula la varianza: en **ladera/alta pendiente** (proxy `Agro_10`) hay mayor
-turbulencia de viento, escorrentía y micro-clima ⇒ señales más ruidosas y de mayor varianza;
+turbulencia de viento, escorrentía y micro-clima => señales más ruidosas y de mayor varianza;
 en valle la señal es más estable. Por eso el bajo NDVI se **agrupa espacialmente** (T1/P2) y
 la calidad del dato depende del emplazamiento del sensor.
 """)
 
-    md("### Cierre — resumen ejecutivo de hallazgos")
+    md("### Cierre - resumen ejecutivo de hallazgos")
     code(r"""
 print("RESUMEN EJECUTIVO")
 print("="*60)
-print(f"T2  · Ener_5 (Costo Gas): {stationarity.classify_drift_vs_randomwalk(ener_noise['Ener_5'])['verdict']}")
-print(f"T3  · SNR real Ener_4: {signal_utils.snr_db(ener_clean['Ener_4'], ener_noise['Ener_4']):.2f} dB")
-print(f"T4  · Butterworth reduce el RMSE de Agro_3 (ver figura t4)")
-print(f"T5  · Cuello de botella (throughput) ENER: nodo {bn_ener} | AGRO: nodo {bn_agro} "
+print(f"T2  . Ener_5 (Costo Gas): {stationarity.classify_drift_vs_randomwalk(ener_noise['Ener_5'])['verdict']}")
+print(f"T3  . SNR real Ener_4: {signal_utils.snr_db(ener_clean['Ener_4'], ener_noise['Ener_4']):.2f} dB")
+print(f"T4  . Butterworth reduce el RMSE de Agro_3 (ver figura t4)")
+print(f"T5  . Cuello de botella (throughput) ENER: nodo {bn_ener} | AGRO: nodo {bn_agro} "
       f"(betweenness degenerada por topología bipartita)")
-print("P1  · Granger Ener_10->Ener_9 evaluado (ver arriba)")
-print("P2  · Relación bajo-NDVI / alta-pendiente vía Spearman")
-print("P3  · ARIMAX con centralidad comparado por AIC")
+print("P1  . Granger Ener_10->Ener_9 evaluado (ver arriba)")
+print("P2  . Relación bajo-NDVI / alta-pendiente vía Spearman")
+print("P3  . ARIMAX con centralidad comparado por AIC")
 print("="*60)
 """)
 
