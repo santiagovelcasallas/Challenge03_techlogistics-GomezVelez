@@ -89,9 +89,13 @@ def _project_here(p) -> bool:
 _found = any(_project_here(p) for p in [Path.cwd(), *Path.cwd().parents])
 
 if not _found:
-    print("Proyecto no encontrado localmente -> clonando desde GitHub (modo Colab)...")
+    print("Proyecto no encontrado localmente -> preparando repo desde GitHub (modo Colab)...")
     if not Path(REPO_DIR).is_dir():
         subprocess.run(["git", "clone", "--depth", "1", REPO_URL], check=True)
+    else:
+        # El clon ya existe (corrida previa): traer lo ÚLTIMO para no usar copia vieja.
+        subprocess.run(["git", "-C", REPO_DIR, "fetch", "--depth", "1", "origin", "main"], check=False)
+        subprocess.run(["git", "-C", REPO_DIR, "reset", "--hard", "FETCH_HEAD"], check=False)
     os.chdir(REPO_DIR)
     # Dependencias que Colab no incluye por defecto (best-effort: el modelo P3
     # tiene fallback si pmdarima no queda disponible).
