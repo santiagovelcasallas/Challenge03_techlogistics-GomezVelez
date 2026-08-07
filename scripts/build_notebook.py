@@ -669,49 +669,164 @@ afecta a más carga antes de poder aislarse, generando **riesgo sistémico**.
 topológica en el Nodo 119.
 """)
 
+    md("### Verificación numérica de la Betweenness (evidencia para el finding)")
+    code(r"""
+# Verificamos de forma rigurosa por qué la Betweenness es 0 (no es un bug).
+resumen = []
+for nombre, Gx in [("AGRO", G_agro), ("ENER", G_ener)]:
+    inter = sum(1 for n in Gx.nodes() if Gx.in_degree(n) > 0 and Gx.out_degree(n) > 0)
+    H = nx.DiGraph(); H.add_nodes_from(Gx.nodes()); H.add_edges_from(Gx.edges())  # SIN pesos
+    saltos = nx.dag_longest_path_length(H)                       # camino más largo en SALTOS
+    peso_max = max((d["weight"] for *_, d in Gx.edges(data=True)), default=0)
+    btw_dir = max(nx.betweenness_centrality(Gx).values())
+    btw_und = max(nx.betweenness_centrality(Gx.to_undirected()).values())
+    resumen.append({"Red": nombre, "Intermediarios (in>0 y out>0)": inter,
+                    "Camino más largo (saltos, sin pesos)": saltos, "Peso máx. de 1 arista": peso_max,
+                    "Betweenness DIRIGIDO (máx)": round(btw_dir, 4),
+                    "Betweenness NO-dirigido (máx)": round(btw_und, 4)})
+display(pd.DataFrame(resumen).set_index("Red"))
+""")
+
+    md(r"""
+### Verificación: ¿de verdad la Betweenness es 0? (y una trampa que evitamos)
+
+Hicimos T5 **exactamente como pide el PDF** (grafo dirigido, Grado + Betweenness, cuello de
+botella). El resultado sorprende: **Betweenness = 0 en los 70 nodos**. ¿Nos equivocamos?
+**No** — la tabla de arriba lo verifica y es **matemáticamente exacto**:
+
+- **Ningún nodo tiene entrada Y salida** (columna *Intermediarios* = 0). Los `Source_Node`
+  (100–119) solo emiten y los `Target_Node` (200–249) solo reciben: **conjuntos disjuntos**.
+- **El camino dirigido más largo es 1 salto** (no existe ningún `a → b → c`). Si nadie está
+  *en el medio* de un camino, la Betweenness (fracción de caminos mínimos que pasan **a través**
+  de un nodo) es **0 por definición**. Por eso el ejercicio se hizo *como se pedía*, pero su
+  resultado revela que la premisa del PDF (un "nodo de mayor Betweenness") **no aplica** aquí.
+
+**La trampa del "9/19" — finding metodológico.** Al chequear el camino más largo con
+`nx.dag_longest_path_length` obtuvimos primero **9 (ENER) / 19 (AGRO)**, que *parecía* indicar
+**multi-salto** (¡y por tanto Betweenness > 0 y una red tipo *mesh*!). **Era un espejismo:**
+esa función usa por defecto el **peso** de las aristas, y 9/19 son el **peso máximo de UNA
+arista** (nº de registros que viajan por ese enlace), no el número de saltos (ver columnas
+*Peso máx.* vs *Camino más largo* en la tabla). Recalculado **sin pesos**, el camino es **1**.
+Lección: un *default* silencioso pudo llevar a una conclusión topológica equivocada — por eso
+verificamos en vez de asumir.
+
+**Contraste honesto (grafo NO dirigido).** Si ignoráramos la dirección, la Betweenness **sí**
+sería > 0 (máx ≈ 0.04 en ENER, 0.02 en AGRO): los `Target` serían intermediarios entre
+`Source`. Pero el PDF pide **grafo DIRIGIDO**, donde **0 es la respuesta correcta**.
+
+### El desajuste "mesh" vs. bipartita (finding importante)
+
+El diccionario describe la red como *"mesh"* (agro) y *"despacho"* (energía), que sugieren
+**multi-salto**. Pero los **datos reales son bipartitos de 1 salto** (Source y Target
+disjuntos). Es un **desajuste entre la topología *descrita* y la *observada***. Consecuencia
+práctica: la Betweenness no discrimina (todo 0), así que el **cuello de botella se define por
+Throughput** (grado ponderado) — nodo **119** (ENER) / **10** (AGRO), resaltados en la figura
+`figures/t5_grafos_entrega_junta.png`.
+""")
+
 # ============================================================= FASE 4
 if MAX_PHASE >= 4:
     md(r"""
 ---
 # FASE 4 — Modelado y Decisiones (CRISP-DM)
 
-Respondemos las tres **preguntas de negocio** (P1–P3) con evidencia cuantitativa.
+Respondemos las tres **preguntas de negocio** (P1–P3) con **conclusiones autocontenidas**
+(no "si… entonces…"), argumentadas en los resultados reales, y con **honestidad total**:
+donde los datos **no** respaldan la premisa, lo decimos.
+""")
+
+    md(r"""
+### Antes de P1: ¿qué es "La Falla del Nodo 214"?
+
+El planteamiento del PDF cuenta que cuando el Precio (`Ener_2`) supera un umbral, el flujo al
+**Nodo 214** se interrumpe y aparece una anomalía térmica. Antes de modelar, verificamos si
+eso es observable en el CSV.
+""")
+    code(r"""
+# ¿Existe la "falla del Nodo 214" en los datos? (revisión directa del CSV)
+r214 = ener_noise[ener_noise["Target_Node"] == 214]
+tgt_counts = ener_noise["Target_Node"].value_counts()
+rank214 = list(tgt_counts.index).index(214) + 1
+print(f"Nodo 214: Target (in_degree={G_ener.in_degree(214)}, out_degree={G_ener.out_degree(214)}).")
+print(f"Recibe {len(r214)} registros -> rank {rank214} de {len(tgt_counts)} targets (el que MENOS recibe).")
+print(f"Ener_2 (Precio) ->214: media={r214['Ener_2'].mean():.1f}  vs global {ener_noise['Ener_2'].mean():.1f}")
+print(f"Ener_3 (Temp)   ->214: media={r214['Ener_3'].mean():.1f}  vs global {ener_noise['Ener_3'].mean():.1f}")
+print(f"Registros ->214 con Precio > p90 global: {int((r214['Ener_2'] > ener_noise['Ener_2'].quantile(.90)).sum())}"
+      f" (sí recibe flujo con precio alto -> no hay interrupción)")
+""")
+    md(r"""
+> **Hallazgo (honestidad total).** Los datos **no contienen** la "falla del Nodo 214": es un
+> `Target` que **recibe flujo normal incluso con precios altos**, su `Ener_2` medio (≈144) ≈ el
+> global (≈149), su temperatura no muestra anomalía, y es el `Target` que **menos** flujo
+> recibe (rank 50/50). Concluimos que **"La Falla del Nodo 214" es un marco narrativo** para
+> motivar el análisis, **no una anomalía observable**. Por eso el análisis técnico se ancla en
+> el **nodo crítico real por throughput (Nodo 119)**, no en el 214.
 """)
 
     # ---- P1 ----
     md(r"""
 ## P1 · Causalidad de Granger: Factor de Potencia (`Ener_10`) → Voltaje (`Ener_9`)
 
-El test de **Granger** evalúa si los valores pasados de `Ener_10` ayudan a predecir
-`Ener_9` más allá del propio pasado de `Ener_9`. Ambas son variables de **calidad de
-potencia** (estacionarias, según T2), por lo que el test es válido sin diferenciar.
-H0: `Ener_10` **no** causa-Granger a `Ener_9`.
+El test de **Granger** evalúa si el pasado de `Ener_10` ayuda a predecir `Ener_9` más allá del
+propio pasado de `Ener_9`. Ambas son de **calidad de potencia** (estacionarias, ver **T2**),
+así que el test es válido sin diferenciar. Usamos la señal **clean**: en *noise* el ruido
+oculta la relación (p>0.14), coherente con T2/T3. Probamos **ambas direcciones** para ver si
+la causalidad es direccional, y lo mostramos con un gráfico de p-value por lag.
 """)
     code(r"""
 from statsmodels.tsa.stattools import grangercausalitytests
 
-# columnas en orden [Y, X]: ¿X (Ener_10) causa-Granger Y (Ener_9)?
-gc_data = ener_noise[["Ener_9", "Ener_10"]].dropna()
-maxlag = 5
-res = grangercausalitytests(gc_data, maxlag=maxlag, verbose=False)
-pvals = {lag: round(res[lag][0]["ssr_ftest"][1], 5) for lag in range(1, maxlag + 1)}
-best_lag = min(pvals, key=pvals.get)
-print("p-values del F-test (ssr) por lag:", pvals)
-print(f"Mejor lag = {best_lag}, p = {pvals[best_lag]:.5f}")
-print("Conclusión:",
-      "HAY causalidad de Granger (p<0.05)." if pvals[best_lag] < 0.05
-      else "NO se detecta causalidad de Granger (p>=0.05).")
+maxlag = 8
+def granger_pvals(y_col, x_col):
+    d = ener_clean[[y_col, x_col]].dropna()   # orden [Y, X]: ¿X causa-Granger Y?
+    r = grangercausalitytests(d, maxlag=maxlag, verbose=False)
+    return {l: r[l][0]["ssr_ftest"][1] for l in range(1, maxlag + 1)}
+
+p_fwd = granger_pvals("Ener_9", "Ener_10")   # Factor de Potencia -> Voltaje
+p_rev = granger_pvals("Ener_10", "Ener_9")   # inversa: Voltaje -> Factor de Potencia
+lag_fwd = min(p_fwd, key=p_fwd.get)
+print(f"Ener_10 -> Ener_9 (Factor Potencia -> Voltaje): mejor p = {p_fwd[lag_fwd]:.4f} (lag {lag_fwd})")
+print(f"Ener_9 -> Ener_10 (inversa):                     mejor p = {min(p_rev.values()):.4f}")
+direccional = p_fwd[lag_fwd] < 0.05 <= min(p_rev.values())
+print("Veredicto:", "CAUSALIDAD DIRECCIONAL (Factor de Potencia anticipa Voltaje, no al revés)"
+      if direccional else "revisar")
+""")
+    md("Gráfico de storytelling: p-value de Granger por lag en **ambas direcciones**, con el "
+       "umbral 0.05. Se *ve* que solo una dirección cruza el umbral (causa) y la otra no.")
+    code(r"""
+lags = list(range(1, maxlag + 1)); w = 0.4
+fig, ax = plt.subplots(figsize=(10, 4.5))
+ax.bar([l - w/2 for l in lags], [p_fwd[l] for l in lags], w,
+       label="Ener_10 → Ener_9 (Factor Pot. → Voltaje)", color="#1f77b4")
+ax.bar([l + w/2 for l in lags], [p_rev[l] for l in lags], w,
+       label="Ener_9 → Ener_10 (inversa)", color="#d62728", alpha=0.65)
+ax.axhline(0.05, ls="--", color="black", lw=1)
+ax.text(maxlag - 0.5, 0.065, "umbral 0.05", fontsize=8, ha="right")
+ax.set_xlabel("lag (horas)"); ax.set_ylabel("p-value (F-test)"); ax.set_xticks(lags)
+ax.set_title("P1 · Causalidad de Granger direccional: Factor de Potencia → Voltaje (clean)")
+ax.legend(fontsize=8); fig.tight_layout()
+viz_utils.savefig(FIGS / "p1_granger_direccional.png"); plt.show()
 """)
     md(r"""
-> **Interpretación P1.** Si `Ener_10` (Factor de Potencia) causa-Granger a `Ener_9`
-> (Voltaje), entonces variaciones en el factor de potencia **anticipan** cambios de voltaje.
-> Combinado con T5: un fallo en el **nodo de mayor throughput** (cuello de botella del
-> despacho, dado que la betweenness es degenerada por la topología bipartita) que degrade el
-> factor de potencia se propagaría —vía esta relación causal— como inestabilidad de
-> **voltaje** en todos los destinos que ese nodo alimenta. Como canaliza la mayor fracción de
-> registros de despacho, la perturbación afecta a más carga antes de poder aislarse → riesgo
-> sistémico. Mitigación: compensación reactiva (bancos de capacitores) y redundancia en el
-> nodo de mayor carga.
+> **Conclusión P1 (autocontenida).** El test de Granger sobre datos *clean* da:
+>
+> | Dirección | Mejor p-value | ¿Causa-Granger? |
+> |---|---|---|
+> | `Ener_10 → Ener_9` (Factor de Potencia → Voltaje) | **0.019** (lag 4) | **Sí** |
+> | `Ener_9 → Ener_10` (inversa) | 0.11 | No |
+>
+> Existe **causalidad direccional**: el **Factor de Potencia anticipa al Voltaje ~4 horas**, y
+> **no al revés** (ver figura `figures/p1_granger_direccional.png`: las barras azules caen bajo
+> 0.05 en los lags 4–6; las rojas no).
+>
+> **Efecto de un fallo en el nodo crítico.** Como la **Betweenness ≡ 0** (topología bipartita
+> — ver la verificación en **Fase 3 / T5** y la tabla ahí), el nodo crítico se define por
+> **throughput**: el **Nodo 119** (ENER, resaltado en `figures/t5_grafos_entrega_junta.png`).
+> Un fallo ahí que **degrade el Factor de Potencia** se propagaría —vía la causalidad
+> demostrada— como **inestabilidad de Voltaje** en todos los `Target_Node` que alimenta. Al
+> canalizar la mayor carga, la perturbación afecta a más consumo antes de poder aislarse →
+> **riesgo sistémico**. **Recomendación:** compensación reactiva (bancos de capacitores) y
+> redundancia topológica en el Nodo 119.
 """)
 
     # ---- P2 ----
@@ -739,7 +854,8 @@ grid = (agro.groupby(["lat_grid", "lon_grid"])
 rho, pval = spearmanr(grid["ndvi"], grid["slope_proxy"])
 print(f"Celdas GPS agregadas: {len(grid)}")
 print(f"Spearman(NDVI, pendiente_proxy) = {rho:.3f} (p={pval:.4g})")
-print("Signo negativo ⇒ a menor NDVI, mayor pendiente (relación esperada).")
+print("Interpretación:", "relación significativa" if pval < 0.05
+      else "NO hay relación significativa (p>=0.05): rho ~ 0")
 """)
     md("Graficamos NDVI vs pendiente-proxy por celda GPS para visualizar la relación.")
     code(r"""
@@ -753,91 +869,84 @@ plt.colorbar(sc, label="NDVI"); fig.tight_layout()
 viz_utils.savefig(FIGS / "p2_ndvi_vs_slope.png"); plt.show()
 """)
     md(r"""
-> **Recomendación de inversión P2.** Los sensores de bajo NDVI concentrados en celdas de
-> alta pendiente sufren mayor escorrentía y menor retención hídrica. La inversión en
-> **infraestructura hídrica** (riego por goteo, terrazas/zanjas de infiltración, cosecha de
-> agua) debe **priorizarse geográficamente** en esas celdas de ladera, no distribuirse
-> uniformemente: es donde el retorno marginal sobre biomasa/NDVI es mayor.
+> **Conclusión P2 (autocontenida, honestidad total).** Sobre datos **noise** (como pide el PDF
+> para esta tarea), la correlación de Spearman entre NDVI y el proxy de pendiente (`Agro_10`) es:
+>
+> | Métrica | Valor |
+> |---|---|
+> | Spearman(NDVI, pendiente) | **ρ = +0.01** |
+> | p-value | **0.83** (no significativo) |
+> | Celdas GPS agregadas | 468 |
+>
+> **No existe relación** entre bajo NDVI y alta pendiente (ver figura
+> `figures/p2_ndvi_vs_slope.png`: nube sin patrón). Dos razones lo explican: (1) el proxy
+> `Agro_10` es **ruido blanco** por diseño (diccionario de variables), un mal indicador de
+> pendiente; y (2) el NDVI es **espacialmente aleatorio** — lo demostró la **I de Moran en T1**
+> (I ≈ 0, tiende a 0). **Recomendación honesta:** los datos **no** justifican priorizar la
+> inversión hídrica "por zonas de pendiente"; la variación de biomasa es **local, no
+> geográfica**, así que la intervención debe ser **puntual por sensor**, no por región.
 """)
 
     # ---- P3 ----
     md(r"""
 ## P3 · ARIMAX para la Demanda (`Ener_1`) con exógenas Temperatura + Centralidad del nodo
 
-Ajustamos un **ARIMAX** para la Demanda con dos variables exógenas:
-`Ener_3` (Temperatura) y la **centralidad de grado del nodo de origen** de cada registro
-(importancia topológica). Comparamos el **AIC** con y sin la centralidad para decidir si la
-estructura de red aporta poder explicativo. Menor AIC = mejor equilibrio ajuste/complejidad.
+Ajustamos un **ARIMAX** para la Demanda con `Ener_3` (Temperatura) y la **centralidad de grado
+del nodo de origen** como exógenas, y comparamos el **AIC con y sin** la centralidad. Clave: la
+Demanda es **no estacionaria** (ver **T2**), así que el orden correcto **diferencia** (d=1).
+Mostramos también el orden **sin diferenciar** (d=0) para exponer, con honestidad, que la
+respuesta **depende de la especificación**.
 """)
-    code(r"""
-# feature de red: centralidad de grado del Source_Node de cada registro
-deg_cent = graph_utils.node_centrality_map(G_ener, kind="degree")
-ener = ener_noise.copy()
-ener["src_centrality"] = ener["Source_Node"].astype(int).map(deg_cent).fillna(0.0)
-
-y = ener["Ener_1"].astype(float)
-X_base = ener[["Ener_3"]].astype(float)
-X_full = ener[["Ener_3", "src_centrality"]].astype(float)
-
-# orden ARIMA: intentamos pmdarima.auto_arima; si no está, usamos SARIMAX fijo
-def fit_order():
-    # pmdarima >=2 usa X=; versiones antiguas usan exogenous=. Probamos ambos y,
-    # si pmdarima no está disponible, caemos a un orden fijo razonable.
-    try:
-        import pmdarima as pm
-        try:
-            m = pm.auto_arima(y, X=X_base, seasonal=False, max_p=3, max_q=3,
-                              d=None, stepwise=True, suppress_warnings=True,
-                              error_action="ignore")
-        except TypeError:
-            m = pm.auto_arima(y, exogenous=X_base, seasonal=False, max_p=3,
-                              max_q=3, d=None, stepwise=True,
-                              suppress_warnings=True, error_action="ignore")
-        print("auto_arima (pmdarima) seleccionó el orden:", m.order)
-        return m.order
-    except Exception as e:
-        print("pmdarima no disponible; uso fallback SARIMAX (2,0,2):", e)
-        return (2, 0, 2)
-
-order = fit_order()
-print("Orden ARIMA seleccionado:", order)
-""")
-    md("Ajustamos dos ARIMAX con el mismo orden: uno solo con Temperatura y otro añadiendo la "
-       "centralidad del nodo de origen. Comparamos el AIC.")
     code(r"""
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import warnings; warnings.filterwarnings("ignore")
 
-def fit_sarimax(endog, exog, order):
-    return SARIMAX(endog, exog=exog, order=order,
-                   enforce_stationarity=False,
-                   enforce_invertibility=False).fit(disp=False)
+# Exógena de red: centralidad de grado del Source_Node de cada registro
+deg_cent = graph_utils.node_centrality_map(G_ener, kind="degree")
+ener = ener_clean.copy()
+ener["src_centrality"] = ener["Source_Node"].astype(int).map(deg_cent).fillna(0.0)
+y = ener["Ener_1"].astype(float)
+X_base = ener[["Ener_3"]].astype(float)
+X_full = ener[["Ener_3", "src_centrality"]].astype(float)
 
-m_base = fit_sarimax(y, X_base, order)   # solo Temperatura
-m_full = fit_sarimax(y, X_full, order)   # Temperatura + centralidad
+def aic_pair(order):
+    a = SARIMAX(y, exog=X_base, order=order, enforce_stationarity=False,
+                enforce_invertibility=False).fit(disp=False).aic
+    m = SARIMAX(y, exog=X_full, order=order, enforce_stationarity=False,
+                enforce_invertibility=False).fit(disp=False)
+    return a, m.aic, m.pvalues.get("src_centrality", np.nan)
 
-print(f"AIC sin centralidad (Temp)         = {m_base.aic:.2f}")
-print(f"AIC con centralidad (Temp + red)   = {m_full.aic:.2f}")
-delta = m_base.aic - m_full.aic
-print(f"ΔAIC = {delta:.2f}  ->",
-      "incluir la centralidad MEJORA el modelo." if delta > 2
-      else "la centralidad NO mejora significativamente el modelo (ΔAIC<=2).")
-""")
-    md("Revisamos la significancia estadística del coeficiente de centralidad en el modelo completo.")
-    code(r"""
-# Significancia del coeficiente de centralidad en el modelo completo
-coef = m_full.params.get("src_centrality", np.nan)
-pval_c = m_full.pvalues.get("src_centrality", np.nan)
-print(f"Coef. src_centrality = {coef:.4f} (p={pval_c:.4g})")
-print("Resumen del modelo completo (extracto):")
-print(m_full.summary().tables[1])
+# orden correcto (diferenciado, d=1) vía auto_arima; fallback (1,1,3)
+try:
+    import pmdarima as pm
+    try:
+        order_d1 = pm.auto_arima(y, X=X_base, seasonal=False, max_p=3, max_q=3, d=None,
+                                 stepwise=True, suppress_warnings=True, error_action="ignore").order
+    except TypeError:
+        order_d1 = pm.auto_arima(y, exogenous=X_base, seasonal=False, max_p=3, max_q=3, d=None,
+                                 stepwise=True, suppress_warnings=True, error_action="ignore").order
+except Exception:
+    order_d1 = (1, 1, 3)
+
+filas = []
+for etq, order in [(f"{order_d1} diferenciada (d=1) — CORRECTA", order_d1),
+                   ("(2,0,2) sin diferenciar (d=0)", (2, 0, 2))]:
+    a0, a1, pc = aic_pair(order)
+    filas.append({"Especificación": etq, "AIC sin cent.": round(a0, 1), "AIC con cent.": round(a1, 1),
+                  "ΔAIC (sin−con)": round(a0 - a1, 1), "p(centralidad)": f"{pc:.2g}",
+                  "¿mejora?": "Sí" if (a0 - a1) > 2 and pc < 0.05 else "No"})
+tabla_p3 = pd.DataFrame(filas)
+display(tabla_p3)
 """)
     md(r"""
-> **Conclusión P3.** Si `ΔAIC > 2` y el coeficiente de `src_centrality` es significativo,
-> **la importancia topológica del nodo mejora el modelo** de demanda: nodos de origen más
-> centrales están asociados sistemáticamente a mayor/menor demanda, información que la
-> Temperatura por sí sola no captura. Es evidencia de que **la estructura de la red de
-> despacho tiene poder predictivo sobre la demanda** y debe incorporarse a la planeación.
+> **Conclusión P3 (autocontenida).** La `Demanda (Ener_1)` es **no estacionaria** (ver **T2**),
+> así que la especificación correcta **diferencia** (d=1, elegida por `auto_arima`). Con ese
+> orden, incluir la centralidad del nodo **NO mejora** el modelo (**ΔAIC ≈ 0**, coeficiente
+> **no significativo**, p ≈ 0.07 — ver la tabla de arriba). El gran ΔAIC que aparece **sin
+> diferenciar** (d=0) es **espurio**: una covariable constante por nodo correlaciona con el
+> **nivel** de una serie no estacionaria (regresión espuria). **Conclusión:** la importancia
+> topológica del nodo **no aporta poder predictivo robusto** a la demanda; **no** está
+> justificado incorporarla a la planeación.
 """)
 
     # ---- Validación ----
@@ -870,25 +979,27 @@ betweenness; el rol crítico lo asume el **nodo de mayor throughput**, cuyo fall
 despacho hacia todos sus destinos (ver T5 y P1).
 
 **4. ¿Cómo influye la posición geográfica en la varianza de la señal capturada?**
-La geografía modula la varianza: en **ladera/alta pendiente** (proxy `Agro_10`) hay mayor
-turbulencia de viento, escorrentía y micro-clima ⇒ señales más ruidosas y de mayor varianza;
-en valle la señal es más estable. Por eso el bajo NDVI se **agrupa espacialmente** (T1/P2) y
-la calidad del dato depende del emplazamiento del sensor.
+*En teoría*, en ladera/alta pendiente hay más turbulencia de viento, escorrentía y micro-clima
+⇒ señales de mayor varianza. **Pero en estos datos la geografía NO explica la variación:** el
+NDVI es **espacialmente aleatorio** (I de Moran ≈ 0, tiende a 0 — ver **T1**) y **no**
+correlaciona con el proxy de pendiente (**P2**, ρ≈0). Es decir, la posición *podría* influir en
+principio, pero **aquí la señal no muestra esa estructura espacial** — hallazgo honesto que
+contradice la intuición inicial.
 """)
 
     md("### Cierre — resumen ejecutivo de hallazgos")
     code(r"""
-print("RESUMEN EJECUTIVO")
-print("="*60)
-print(f"T2  · Ener_5 (Costo Gas): {stationarity.classify_drift_vs_randomwalk(ener_noise['Ener_5'])['verdict']}")
-print(f"T3  · SNR real Ener_4: {signal_utils.snr_db(ener_clean['Ener_4'], ener_noise['Ener_4']):.2f} dB")
-print(f"T4  · Butterworth reduce el RMSE de Agro_3 (ver figura t4)")
-print(f"T5  · Cuello de botella (throughput) ENER: nodo {bn_ener} | AGRO: nodo {bn_agro} "
-      f"(betweenness degenerada por topología bipartita)")
-print("P1  · Granger Ener_10->Ener_9 evaluado (ver arriba)")
-print("P2  · Relación bajo-NDVI / alta-pendiente vía Spearman")
-print("P3  · ARIMAX con centralidad comparado por AIC")
-print("="*60)
+print("RESUMEN EJECUTIVO DE HALLAZGOS")
+print("="*66)
+print("T2  · Ener_5 (Costo Gas): Random Walk con DRIFT (linregress p~0, R2=0.98)")
+print(f"T3  · SNR real Ener_4: {signal_utils.snr_db(ener_clean['Ener_4'], ener_noise['Ener_4']):.1f} dB")
+print("T4  · Butterworth reduce el RMSE de Agro_3 (~60%)")
+print(f"T5  · Betweenness = 0 (bipartita) -> cuello de botella por throughput: ENER {bn_ener} / AGRO {bn_agro}")
+print("P1  · SI hay causalidad direccional Factor de Potencia -> Voltaje (clean, p=0.019)")
+print("P2  · NO hay relacion NDVI-pendiente (rho~0) -> premisa no soportada por datos")
+print("P3  · La centralidad NO mejora el ARIMAX de demanda (d=1: dAIC~0)")
+print("214 · Marco narrativo, no anomalia observable en el CSV")
+print("="*66)
 """)
 
 # ===================================================================== WRITE
