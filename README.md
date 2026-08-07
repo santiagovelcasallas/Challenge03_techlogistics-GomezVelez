@@ -33,8 +33,8 @@ Challenge03_techlogistics-GomezVelez/
 ├── reports/
 │   └── informe_tecnico.pdf   # informe ejecutivo (generado programáticamente)
 ├── scripts/
-│   ├── build_notebook.py # genera el notebook con nbformat (celdas MD + código)
-│   └── build_report.py   # genera el PDF con ReportLab
+│   ├── build_report.py   # genera el PDF con ReportLab (solo lee figuras)
+│   └── legacy/           # generador histórico DESACTIVADO (no ejecutar) — ver DEPRECATED.md
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -71,16 +71,18 @@ venv\Scripts\activate            # Windows PowerShell/CMD
 pip install -r requirements.txt
 #   alternativa exacta de todo el árbol:  pip install -r requirements-lock.txt
 
-# 3) (Opcional) Regenerar el notebook desde el generador
-py scripts/build_notebook.py
-
-# 4) Ejecutar el notebook de principio a fin
+# 3) Ejecutar el notebook de principio a fin (el notebook ES la fuente de verdad;
+#    se edita directamente, NO se regenera desde ningún script)
 jupyter nbconvert --to notebook --execute --inplace ^
   notebooks/challenge03_analitica_multidimensional.ipynb
 
-# 5) Generar el informe PDF
+# 4) Generar el informe PDF
 py scripts/build_report.py
 ```
+
+> **Nota:** el notebook es la **única fuente de verdad** y se edita directamente (Colab/Jupyter).
+> El generador histórico quedó **desactivado** en `scripts/legacy/` (no ejecutar): regenerar
+> sobrescribiría las ediciones hechas a mano en el notebook.
 
 > ✅ **Verificado**: se recreó el entorno desde cero (`venv` limpio → `requirements.txt`) y
 > se reejecutó todo el pipeline (58 celdas, **0 errores**) + generación del PDF. El `venv/`
