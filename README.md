@@ -31,10 +31,9 @@ Challenge03_techlogistics-GomezVelez/
 │   └── viz_utils.py      # scatter_mapbox geo, dibujo de grafos, export PNG
 ├── figures/              # PNG exportados (evidencia del informe)
 ├── reports/
-│   └── informe_tecnico.pdf   # informe ejecutivo (generado programáticamente)
+│   └── Challenge03_informe_tecnico_ejecutivo_techlogistics.pdf   # informe ejecutivo final
 ├── scripts/
-│   ├── build_report.py   # genera el PDF con ReportLab (solo lee figuras)
-│   └── legacy/           # generador histórico DESACTIVADO (no ejecutar) — ver DEPRECATED.md
+│   └── legacy/           # generadores históricos DESACTIVADOS (no ejecutar) — ver DEPRECATED.md
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -75,14 +74,16 @@ pip install -r requirements.txt
 #    se edita directamente, NO se regenera desde ningún script)
 jupyter nbconvert --to notebook --execute --inplace ^
   notebooks/challenge03_analitica_multidimensional.ipynb
-
-# 4) Generar el informe PDF
-py scripts/build_report.py
 ```
 
-> **Nota:** el notebook es la **única fuente de verdad** y se edita directamente (Colab/Jupyter).
-> El generador histórico quedó **desactivado** en `scripts/legacy/` (no ejecutar): regenerar
-> sobrescribiría las ediciones hechas a mano en el notebook.
+El **informe ejecutivo final** está en
+`reports/Challenge03_informe_tecnico_ejecutivo_techlogistics.pdf` (documento definitivo hecho
+a mano; ya no se genera por script).
+
+> **Nota:** el notebook y el informe son la **fuente de verdad** y se editan directamente
+> (Colab/Jupyter). Los generadores históricos (`build_notebook.py`, `build_report.py`) quedaron
+> **desactivados** en `scripts/legacy/` (no ejecutar): regenerar sobrescribiría el trabajo hecho
+> a mano.
 
 > ✅ **Verificado**: se recreó el entorno desde cero (`venv` limpio → `requirements.txt`) y
 > se reejecutó todo el pipeline (58 celdas, **0 errores**) + generación del PDF. El `venv/`
@@ -137,8 +138,8 @@ py scripts/build_report.py
   de alta pendiente (priorización de inversión hídrica); y la **centralidad del nodo mejora el
   ARIMAX** de demanda (menor AIC).
 
-> Los valores numéricos exactos se calculan en el notebook y en el informe PDF
-> (`reports/informe_tecnico.pdf`), reproducibles con los scripts de `scripts/`.
+> Los valores numéricos exactos están en el notebook y en el informe ejecutivo
+> (`reports/Challenge03_informe_tecnico_ejecutivo_techlogistics.pdf`).
 
 ---
 
