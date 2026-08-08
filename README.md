@@ -2,154 +2,261 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/santiagovelcasallas/Challenge03_techlogistics-GomezVelez/blob/main/notebooks/challenge03_analitica_multidimensional.ipynb)
 
-Análisis multicapa (CRISP-DM) sobre dos redes de sensores de **TechLogistics S.A.**:
-**Agroindustria/Clima** (`agro_*`) y **Energía/Economía** (`ener_*`). El proyecto combina
-**geo-visualización**, **procesamiento de señales** (FFT, filtrado Butterworth),
-**diagnóstico de estacionariedad** (ADF), **análisis de redes** (centralidades) y
-**modelado** (Granger, ARIMAX) para responder tres preguntas de negocio y cuatro de validación.
+**Curso:** Análisis de Datos Avanzado / Fundamentos en Ciencia de Datos — Maestría en Ciencia de los Datos, EAFIT
+**Docente:** Jorge Iván Padilla-Buriticá · **Periodo:** 2026
+**Caso:** TechLogistics S.A. (ficticio) — de señales y redes a decisiones operativas.
 
-> Proyecto académico — EAFIT, Maestría en Ciencia de los Datos.
->
+**Integrantes del equipo:**
+
+| Nombre completo | Cédula |
+| --- | --- |
+| Santiago Alberto Vélez Casallas | 1072714309 |
+| Cristian Miguel Gómez Salazar | 1003402002 |
+
 > **Nota sobre la numeración:** el PDF del docente se titula *"Challenge 02"*, pero corresponde
 > al **workshop de la Lecture 03**. Se unifica la etiqueta a **Challenge 03** (el "02" fue un
 > error de numeración en el documento fuente).
 
 ---
 
-## 📁 Estructura del repositorio
+## 1. Resumen ejecutivo
+
+TechLogistics opera dos redes de sensores georreferenciadas pero desconectadas entre sí:
+**Agroindustria/Clima** (`agro_*`) y **Energía/Economía** (`ener_*`). La junta necesita saber
+**qué proteger, dónde invertir y qué modelar**. Analizamos 2.000 registros por red con
+estadística espacial, series de tiempo, procesamiento de señales, grafos y pronóstico fuera de
+muestra — siguiendo CRISP-DM y con **honestidad total**: donde los datos no respaldan la
+premisa, lo decimos.
+
+**Decisión central.** Proteger el **nodo energético 119** (compensación reactiva + redundancia)
+y desplegar intervenciones hídricas **puntuales por sensor**. La evidencia **no** respalda una
+intervención territorial "por pendiente" ni incorporar la centralidad del nodo al pronóstico de
+demanda.
+
+| Hallazgo | Evidencia | Decisión |
+|---|---|---|
+| Nodo energético crítico | Nodo 119: 120 registros; **betweenness = 0** en toda la red | Redundancia y compensación reactiva en el nodo 119 |
+| Factor de potencia anticipa voltaje | Granger **p = 0,019** (rezago 4 h); dirección inversa p = 0,113 | Alerta temprana sobre el factor de potencia |
+| NDVI sin patrón territorial | Moran **I ≈ 0**; Spearman **ρ = 0,010** (p = 0,828) | Intervenir sensores puntuales, **no** "zonas de pendiente" |
+| Pronóstico de demanda | RMSE 2,69 vs 2,68 (+0,4 %); Diebold-Mariano **p = 0,44** | Mantener temperatura; **no** añadir centralidad |
+| Filtrado de humedad relativa | RMSE 3,341 → 1,307 (**−60,9 %**) | Filtrar antes de modelar y alertar |
+| Costo del gas con tendencia | Pendiente 0,011; **R² = 0,978**; p ≈ 0 | Modelar en diferencias y monitorear la tendencia |
+
+> **Advertencia de evidencia.** La "falla del nodo 214" del enunciado **no aparece en los datos**:
+> es el `Target` que **menos** flujo recibe (27 registros, rank 50/50), recibe flujo incluso con
+> precio > percentil 90, y sus medias de precio/temperatura ≈ las globales. Se trata como **marco
+> narrativo**, no como anomalía demostrada.
+
+---
+
+## 2. Preguntas de negocio (P1–P3)
+
+- **P1.** ¿El **factor de potencia** (`Ener_10`) anticipa el **voltaje** (`Ener_9`)? ¿Qué implica
+  un fallo en el nodo crítico para la estabilidad de la red?
+- **P2.** ¿Debe priorizarse la **inversión hídrica** en zonas de alta pendiente (proxy `Agro_10`)?
+- **P3.** ¿La **importancia del nodo** en la red (centralidad) mejora el **pronóstico de demanda**?
+
+---
+
+## 3. Estructura del repositorio
 
 ```
 Challenge03_techlogistics-GomezVelez/
 ├── data/                 # CSV (clean + noise) — versionados (pequeños, reproducibilidad)
 ├── notebooks/
-│   └── challenge03_analitica_multidimensional.ipynb   # análisis completo (ejecutado)
-├── src/                  # funciones reutilizables
-│   ├── io_utils.py       # carga + DatetimeIndex sintético + diccionario de variables
-│   ├── stationarity.py   # ADF, rolling stats, drift vs random walk
-│   ├── signal_utils.py   # FFT/PSD, Butterworth, SNR, RMSE
-│   ├── graph_utils.py    # grafo dirigido, degree/betweenness, cuello de botella
-│   └── viz_utils.py      # scatter_mapbox geo, dibujo de grafos, export PNG
+│   └── challenge03_analitica_multidimensional.ipynb   # análisis completo (fuente de verdad)
+├── src/                  # funciones reutilizables (io, estacionariedad, señales, grafos, espacial, viz)
 ├── figures/              # PNG exportados (evidencia del informe)
 ├── reports/
 │   └── Challenge03_informe_tecnico_ejecutivo_techlogistics.pdf   # informe ejecutivo final
 ├── scripts/
 │   └── legacy/           # generadores históricos DESACTIVADOS (no ejecutar) — ver DEPRECATED.md
-├── requirements.txt
+├── requirements.txt · requirements-lock.txt
 ├── .gitignore
 └── README.md
 ```
 
-### ¿Por qué se versiona `data/`?
-Los CSV son pequeños (~450 KB c/u) y son **necesarios para reproducir** el análisis de
-principio a fin. Por eso se incluyen en el repositorio. Lo que **sí** se ignora (`.gitignore`)
-es el entorno virtual (`venv/`), cachés y checkpoints.
+Los CSV se versionan (son pequeños y necesarios para reproducir); el `venv/` se ignora. El
+**notebook y el informe PDF son la fuente de verdad** y se editan directamente — los generadores
+que existían al inicio (`build_notebook.py`, `build_report.py`) quedaron **desactivados** en
+`scripts/legacy/`.
 
 ---
 
-## ▶️ Ejecutar en Google Colab (sin instalar nada)
+## 4. Cómo reproducir
 
-Haz clic en el botón **Open in Colab** de arriba y luego *Entorno de ejecución → Ejecutar
-todo*. La **primera celda (Bootstrap)** detecta que está en Colab, **clona este repositorio**
-(trayendo `src/` y `data/`) e instala `pmdarima`, de modo que `from src import ...` y la carga
-de los CSV funcionan sin pasos manuales. La misma celda no hace nada cuando se ejecuta en local.
+**Google Colab (sin instalar nada):** clic en el botón *Open in Colab* de arriba → *Entorno de
+ejecución → Ejecutar todo*. La **primera celda (Bootstrap)** detecta Colab, clona el repositorio
+(trae `src/` y `data/`) e instala las dependencias que faltan.
 
-## 🔧 Reproducción local
-
-Requiere **Python 3.11** (probado en 3.11.4). Las dependencias están **pinneadas a
-versiones exactas** en `requirements.txt`; el pipeline completo se ejecuta de cero sin
-errores con ese conjunto. Para una réplica byte-a-byte de todo el árbol, usar
-`requirements-lock.txt`.
-
+**Local (Python 3.11):**
 ```bash
-# 1) Crear y activar el entorno virtual
-py -m venv venv
-venv\Scripts\activate            # Windows PowerShell/CMD
-# source venv/bin/activate       # Linux/macOS
-
-# 2) Instalar dependencias (versiones exactas probadas)
-pip install -r requirements.txt
-#   alternativa exacta de todo el árbol:  pip install -r requirements-lock.txt
-
-# 3) Ejecutar el notebook de principio a fin (el notebook ES la fuente de verdad;
-#    se edita directamente, NO se regenera desde ningún script)
+py -m venv venv && venv\Scripts\activate      # (source venv/bin/activate en Linux/macOS)
+pip install -r requirements.txt               # exacto: requirements-lock.txt
 jupyter nbconvert --to notebook --execute --inplace ^
   notebooks/challenge03_analitica_multidimensional.ipynb
 ```
 
-El **informe ejecutivo final** está en
-`reports/Challenge03_informe_tecnico_ejecutivo_techlogistics.pdf` (documento definitivo hecho
-a mano; ya no se genera por script).
-
-> **Nota:** el notebook y el informe son la **fuente de verdad** y se editan directamente
-> (Colab/Jupyter). Los generadores históricos (`build_notebook.py`, `build_report.py`) quedaron
-> **desactivados** en `scripts/legacy/` (no ejecutar): regenerar sobrescribiría el trabajo hecho
-> a mano.
-
-> ✅ **Verificado**: se recreó el entorno desde cero (`venv` limpio → `requirements.txt`) y
-> se reejecutó todo el pipeline (58 celdas, **0 errores**) + generación del PDF. El `venv/`
-> NO se versiona (está en `.gitignore`); cada quien lo reconstruye con los comandos de arriba.
+> **Supuestos declarados:** los archivos `*_clean` existen y se usan como referencia real para
+> SNR/RMSE; sin columna de fecha se adopta un `DatetimeIndex` horario sintético desde 2023-01-01;
+> semilla NumPy = 42; significancia α = 0,05.
 
 ---
 
-## 🧭 Supuestos metodológicos (declarados)
+## 5. Lo que dicen los datos (evidencia con figuras y tablas)
 
-1. **La señal `*_clean` SÍ existe.** El brief asumía que solo se entregaron los `*_noise`,
-   pero `agro_clean.csv` y `ener_clean.csv` están presentes. Se usan como **referencia real
-   (ground truth)** para SNR y RMSE (corrección documentada al supuesto original). Aun así se
-   construye la versión *denoised* (Butterworth) para demostrar el pipeline de filtrado.
-2. **Sin timestamp.** Los CSV no traen columna temporal. Se crea un **`DatetimeIndex`
-   sintético horario** (`freq='h'`, inicio `2023-01-01`) para todo el análisis de series.
-3. **Reproducibilidad.** Semilla de NumPy fija (`seed=42`).
-4. **Diccionario de variables.** Cada variable se interpreta según el diccionario provisto.
+### 5.1 Geografía (T1): la biomasa baja **no** forma una zona continua
+
+![Sensores agro en el Oriente antioqueño — color=NDVI, tamaño=Humedad](figures/t1_geo_ndvi.png)
+
+El color es NDVI (verdor/biomasa) y el tamaño, humedad. Los valores bajos aparecen **dispersos**.
+La **I de Moran** confirma que la cercanía geográfica no produce NDVI parecido → **aleatoriedad
+espacial**:
+
+| Vecinos (k) | Moran's I | p-value | Lectura |
+|---|---|---|---|
+| 8 | +0,0148 | 0,153 | tiende a 0 |
+| 15 | +0,0019 | 0,750 | tiende a 0 |
+
+### 5.2 Series de tiempo (T2): qué cambia y qué permanece estable
+
+Test **ADF** (α = 0,05) sobre las 10 series de energía:
+
+| Grupo | Variables | Lectura |
+|---|---|---|
+| **No estacionarias** | Ener_1, Ener_2, Ener_3, Ener_5, Ener_6, Ener_7 | media/nivel cambia → diferenciar antes de modelar |
+| **Estacionarias** | Ener_4, Ener_8, Ener_9, Ener_10 | fluctúan alrededor de un nivel estable |
+
+Para las **no estacionarias**, la **ventana móvil (50)** muestra la media derivando y la varianza
+cambiando:
+
+![Ventana móvil (media y varianza, 50) de las series no estacionarias](figures/t2_rolling_no_estacionarias.png)
+
+El **Costo del Gas (`Ener_5`)** sube de ~5 a ~25: pendiente **0,011**/hora, **R² = 0,978**, p ≈ 0
+→ **Random Walk con Drift**, no fluctuación sin dirección.
+
+![Costo del gas: serie, media y varianza móvil](figures/t2_ener5_rolling.png)
+
+### 5.3 Señales (T3, T4): dónde está el ruido y cuánto ayuda filtrar
+
+La generación eólica (`Ener_4`) conserva su señal en **bajas** frecuencias; el ruido eleva de
+forma casi uniforme las **altas** (81,5 % de la energía del residuo por encima de 0,1 ciclos/hora).
+El **SNR observado es 18,0 dB** — mayor que el rango nominal (5–12 dB), pero `Ener_4` sigue siendo
+la serie-señal más ruidosa del grupo principal.
+
+![FFT y PSD de Ener_4: el ruido eleva las altas frecuencias](figures/t3_ener4_spectrum.png)
+
+Un **Butterworth** pasa-bajo (orden 4) sobre `Agro_3` reduce el RMSE frente a la señal limpia de
+**3,341 → 1,307 (−60,9 %)**: elimina oscilaciones rápidas que inducirían falsas alertas y
+sobreajuste.
+
+![Humedad relativa: ruidosa, referencia limpia y reconstrucción Butterworth](figures/t4_agro3_butterworth.png)
+
+### 5.4 Red (T5): el cuello de botella real es el **nodo 119**
+
+Los `Source_Node` y `Target_Node` son **conjuntos disjuntos** y solo existe **un salto**: ningún
+nodo es intermediario, así que la **betweenness vale 0 para los 70 nodos** (verificado — no es un
+bug, es una topología **bipartita**, aunque el diccionario la llame *mesh*). La criticidad se mide
+entonces por **throughput** (registros que circulan por el nodo).
+
+![Redes dirigidas bipartitas; en rojo el nodo de mayor throughput](figures/t5_grafos_entrega_junta.png)
+
+| Red | Nodo crítico | Throughput | Betweenness |
+|---|---|---|---|
+| Energía | **119** | 120 | 0,000 |
+| Agro | **10** | 172 | 0,000 |
+
+### 5.5 P1 — El factor de potencia **anticipa** el voltaje (causalidad direccional)
+
+Granger sobre datos *clean* (ambas series estacionarias), ocho rezagos y ambas direcciones:
+
+| Dirección | Mejor p-value | ¿Causa-Granger? |
+|---|---|---|
+| `Ener_10 → Ener_9` (Factor de Potencia → Voltaje) | **0,019** (rezago 4 h) | **Sí** |
+| `Ener_9 → Ener_10` (inversa) | 0,113 | No |
+
+![P-values de Granger por rezago: solo una dirección cruza el 0,05](figures/p1_granger_direccional.png)
+
+**Respuesta P1.** El factor de potencia anticipa el voltaje ~4 h y no al revés. Un fallo en el
+**nodo 119** que degrade el factor de potencia se propagaría como inestabilidad de voltaje en los
+destinos que alimenta → **redundancia y compensación reactiva en el nodo 119**.
+
+### 5.6 P2 — **No** priorizar inversión "por zonas de pendiente"
+
+Tras filtrar el jitter GPS (468 celdas ~1 km) y comparar NDVI con `Agro_10` (proxy de pendiente):
+**Spearman ρ = +0,010, p = 0,828** — sin patrón. Además, el diccionario define `Agro_10` como
+**ruido blanco**, un proxy débil.
+
+![NDVI vs proxy de pendiente en 468 celdas GPS: dispersión sin tendencia](figures/p2_ndvi_vs_slope.png)
+
+**Respuesta P2.** La biomasa baja es **local**, no geográfica. Intervención **puntual por sensor**
+(auditar humedad/suelo en puntos de bajo NDVI, pilotos de riego localizado), no zonificación.
+
+### 5.7 P3 — La centralidad **no** mejora el pronóstico de demanda
+
+Entrenamos un **ARIMAX con la primera mitad** de la serie y pronosticamos la **segunda** (no
+vista). Base = Temperatura; alternativo = Temperatura + centralidad del nodo:
+
+| Modelo | RMSE (mitad no vista) | Lectura |
+|---|---|---|
+| Temperatura | **2,69** | base |
+| Temperatura + Centralidad | **2,68** | mejora de solo **0,4 %** |
+| *Variación natural de la demanda* | *14,38* | ambos errores son bajos |
+
+![Demanda real y pronósticos: las curvas azul y roja se superponen](figures/p3_forecast.png)
+
+La diferencia **no es estadísticamente significativa** (**Diebold-Mariano p = 0,44**). La
+temperatura ya captura la señal predictiva → **modelo simple**, sin centralidad.
+
+### 5.8 Preguntas de validación (soporte visual)
+
+![Soporte a las 4 preguntas de validación](figures/validacion_soporte.png)
+
+- **Q1 · Pearson espuria:** `Ener_5` y `Ener_6` dan Pearson **r = −0,99**, pero es espurio (solo
+  por sus tendencias opuestas); en **diferencias** cae a **0,02**. El engaño es la **magnitud**.
+- **Q2 · Ruido y ARMA:** el ruido sesga los coeficientes AR **hacia 0**; una memoria real de 0,7
+  se mide como **0,54** a 5 dB → filtrar antes de modelar (T4) recupera los coeficientes.
+- **Q3 · "Bridge":** en una red multisalto un puente fragmentaría la red; aquí **no hay puentes**
+  (bipartita de 1 salto) y la criticidad recae en el **hub de throughput (119)**.
+- **Q4 · Geografía y varianza:** en teoría influiría, pero aquí **no hay estructura espacial**
+  (Moran I ≈ 0; NDVI no correlaciona con la pendiente).
 
 ---
 
-## 🗺️ Fases y tareas (CRISP-DM)
+## 6. Decisión recomendada y plan de acción
 
-| Fase | Tarea | Contenido |
-|------|-------|-----------|
-| 1 | T1 | Geo-visualización `scatter_mapbox` (color=NDVI, tamaño=Humedad) + clustering espacial |
-| 1 | T2 | ADF sobre energía + media/varianza móvil; Drift vs Random Walk (Ener_5) |
-| 2 | T3 | FFT/PSD de Ener_4, banda del ruido inyectado y **SNR real** |
-| 2 | T4 | Butterworth pasa-bajo sobre Agro_3 (RH) + **RMSE** vs referencia |
-| 3 | T5 | Grafos dirigidos, degree + **betweenness**, **nodo cuello de botella** |
-| 4 | P1 | Granger `Ener_10 → Ener_9` y efecto de un fallo en el nodo puente |
-| 4 | P2 | GPS filtrado, bajo NDVI vs alta pendiente (proxy Agro_10), inversión hídrica |
-| 4 | P3 | ARIMAX de Demanda con Temperatura + centralidad; comparación de **AIC** |
+| Horizonte | Acción | Indicador |
+|---|---|---|
+| 0–30 días | Instrumentar factor de potencia y voltaje en el nodo 119; alarmas con ventana de 4 h | cobertura de telemetría; alertas validadas |
+| 0–60 días | Redundancia y bancos de capacitores en el nodo 119 | estabilidad de voltaje |
+| 0–45 días | Aplicar filtrado Butterworth a `Agro_3` antes de modelar/alertar | RMSE y falsas alertas |
+| 30–90 días | Pilotos hídricos en sensores de bajo NDVI, **sin** zonificación por pendiente | Δ NDVI/humedad vs. control |
+| Trimestral | Reentrenar pronóstico con temperatura; aceptar variables nuevas **solo** con mejora fuera de muestra | RMSE y prueba DM |
 
 ---
 
-## 🔑 Hallazgos clave
+## 7. Limitaciones y honestidad
 
-- **Estacionariedad (T2).** Las series de calidad de potencia (`Ener_8-10`) son estacionarias;
-  los factores macro (`Ener_5-7`) no. El **Costo del Gas (Ener_5)** se comporta como un
-  **Random Walk con Drift** (tendencia embebida + varianza móvil creciente).
-- **Señales (T3–T4).** El ruido inyectado en `Ener_4` es de **alta frecuencia/banda ancha**;
-  el **SNR real** se calcula directamente (≈18 dB; `Ener_4` es la serie-señal de menor SNR,
-  la más ruidosa del grupo principal, aunque por encima del objetivo nominal de 5–12 dB por
-  su gran amplitud cíclica). El **Butterworth pasa-bajo reduce el RMSE de `Agro_3` ~60 %**,
-  recuperando la señal subyacente y mejorando la capacidad predictiva.
-- **Redes (T5).** Ambas redes son **bipartitas** (Source y Target disjuntos, *single-hop*), por
-  lo que la **betweenness es 0 para todos los nodos** — un hallazgo topológico, no un error. El
-  **cuello de botella** se define entonces por **throughput** (grado ponderado); en la red de
-  **despacho** eléctrico ese nodo de máxima carga es el punto crítico de estabilidad.
-- **Negocio (P1–P3).** Existe relación causal (Granger) entre factor de potencia y voltaje,
-  con implicaciones de estabilidad ante fallos del nodo puente; el bajo NDVI se asocia a zonas
-  de alta pendiente (priorización de inversión hídrica); y la **centralidad del nodo mejora el
-  ARIMAX** de demanda (menor AIC).
+El tiempo es **sintético**; el dataset es académico; `Agro_10` **no** mide pendiente (es ruido
+blanco); la topología observada es **bipartita** aunque el diccionario use la palabra *mesh*; y el
+**SNR realizado** de `Ener_4` (18 dB) no coincide con el rango nominal del reto (5–12 dB). Estas
+limitaciones se informan explícitamente para no ofrecer recomendaciones más fuertes que la
+evidencia.
 
-> Los valores numéricos exactos están en el notebook y en el informe ejecutivo
-> (`reports/Challenge03_informe_tecnico_ejecutivo_techlogistics.pdf`).
+---
+
+## 8. Declaración de uso de Inteligencia Artificial
+
+Se usó IA generativa (Claude) como **par de programación y redacción**: sintaxis de
+`pandas`/`statsmodels`, refactor de utilidades en `src/`, borradores de texto y depuración. **Las
+decisiones de criterio** (elección de pruebas estadísticas, interpretación de resultados,
+correcciones metodológicas — p. ej. detectar que la betweenness es 0 por bipartitismo, o preferir
+un test fuera de muestra + Diebold-Mariano sobre el AIC — y la recomendación final) fueron
+discutidas y validadas por el equipo.
 
 ---
 
 ## 📊 Stack técnico
 
 pandas · numpy · scipy · statsmodels · pmdarima · networkx · plotly · matplotlib · seaborn ·
-scikit-learn · kaleido · nbformat/nbconvert · reportlab
-
-> **Nota sobre exportación de figuras.** `kaleido` (export estático de Plotly) se incluye en
-> `requirements.txt`, pero en este entorno Windows su primer `write_image` **bloquea el
-> kernel**. Como alternativa equivalente y fiable, las figuras PNG de evidencia se exportan
-> con **matplotlib**; la versión interactiva `scatter_mapbox` de Plotly se conserva en el
-> notebook para exploración.
+contextily · scikit-learn · nbformat/nbconvert
